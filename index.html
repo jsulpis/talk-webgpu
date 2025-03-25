@@ -12,9 +12,24 @@
          body {
             margin: 0;
          }
+         .stats {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 1.5rem;
+         }
+         p {
+            margin: 0;
+         }
       </style>
    </head>
    <body>
-      <script type="module" src="./main.js"></script>
+      <div class="stats">
+         <p>objects: <strong id="objects">0</strong></p>
+         <p>compute: <strong id="compute">0ms</strong></p>
+         <p>render: <strong id="render">0ms</strong></p>
+      </div>
+      <script type="module" src="src/main.ts"></script>
    </body>
 </html>
