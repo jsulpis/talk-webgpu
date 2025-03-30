@@ -11,22 +11,36 @@
       }
       .stats {
         position: absolute;
+        background: white;
+        padding: 1em;
+        border-radius: 0.25em;
         bottom: 1rem;
         left: 1rem;
         font-family: Arial, Helvetica, sans-serif;
         font-size: 1.5rem;
+
+        p:has(strong:empty) {
+          display: none;
+        }
       }
       p {
         margin: 0;
+      }
+      canvas {
+        width: 100svw;
+        height: 100svh;
+        display: block;
       }
     </style>
   </head>
   <body>
     <div class="stats">
-      <p>objects: <strong id="objects">0</strong></p>
-      <p>compute: <strong id="compute">0ms</strong></p>
-      <p>render: <strong id="render">0ms</strong></p>
+      <p>api: <strong id="api">WebGL</strong></p>
+      <p>objects: <strong id="objects"></strong></p>
+      <p>compute: <strong id="compute"></strong></p>
+      <p>render: <strong id="render"></strong></p>
     </div>
-    <script type="module" src="src/main.ts"></script>
+    <!-- <script type="module" src="src/three/fishes.ts"></script> -->
+    <script type="module" src="src/vanilla/particles-gpu.ts"></script>
   </body>
 </html>

@@ -1,8 +1,8 @@
-import * as THREE from "three";
+import * as THREE from "three/webgpu";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { clone } from "three/addons/utils/SkeletonUtils.js";
-import { BOUNDS, computePositions, computeVelocities } from "./gpgpu";
+import { BOUNDS, computePositions, computeVelocities } from "../gpgpu";
 
 const modelUrl = "/Fish.glb";
 
@@ -10,6 +10,7 @@ const WIDTH = 16;
 const FISHES = WIDTH * WIDTH;
 
 document.getElementById("objects")!.innerText = FISHES.toString();
+document.getElementById("api")!.innerText = "WebGPU";
 
 const models: THREE.Object3D[] = [];
 
@@ -89,11 +90,13 @@ const material = new THREE.MeshBasicMaterial({
 const cube = new THREE.Mesh(geometry, material);
 scene.add(cube);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGPURenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setAnimationLoop(animate);
 document.body.appendChild(renderer.domElement);
+
+console.log(renderer.backend);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
