@@ -1,17 +1,29 @@
 import { mat4, vec3 } from "gl-matrix";
-import { BOUNDS } from "../gpgpu";
+import { BOUNDS, computePositions, computeVelocities } from "../gpgpu";
+
+const WIDTH = 30;
+const FISHES = WIDTH * WIDTH;
 
 // Vertex shader program
 const vsSource = `
 struct Uniforms {
-    modelViewMatrix: mat4x4f,
     projectionMatrix: mat4x4f,
-    normalMatrix: mat4x4f,
+    viewMatrix: mat4x4f,
     lightDirection: vec3f,
     lightColor: vec3f,
     ambientColor: vec3f,
 }
 @binding(0) @group(0) var<uniform> uniforms: Uniforms;
+
+struct InstanceUniforms {
+    modelMatrix: mat4x4f,
+}
+@binding(1) @group(0) var<storage> instances: array<InstanceUniforms>;
+
+struct InstanceColors {
+    colors: array<vec4f, ${FISHES}>,
+}
+@binding(2) @group(0) var<uniform> instanceColors: InstanceColors;
 
 struct VertexOutput {
     @builtin(position) position: vec4f,
@@ -23,14 +35,22 @@ struct VertexOutput {
 @vertex
 fn vertexMain(
     @location(0) position: vec4f,
-    @location(1) color: vec4f,
     @location(2) normal: vec3f,
+    @builtin(instance_index) instanceIndex: u32,
 ) -> VertexOutput {
     var output: VertexOutput;
-    output.position = uniforms.projectionMatrix * uniforms.modelViewMatrix * position;
-    output.normal = (uniforms.normalMatrix * vec4f(normal, 1.0)).xyz;
-    output.lightDirection = uniforms.lightDirection;
-    output.color = color;
+    let modelMatrix = instances[instanceIndex].modelMatrix;
+    let modelViewMatrix = uniforms.viewMatrix * modelMatrix;
+    output.position = uniforms.projectionMatrix * modelViewMatrix * position;
+
+    // Transform normal to view space
+    // Since we're only using translation and rotation (no scaling),
+    // we can use the modelViewMatrix directly
+    output.normal = (modelViewMatrix * vec4f(normal, 0.0)).xyz;
+
+    // Transform light direction to view space
+    output.lightDirection = (uniforms.viewMatrix * vec4f(uniforms.lightDirection, 0.0)).xyz;
+    output.color = instanceColors.colors[instanceIndex];
     return output;
 }
 `;
@@ -38,9 +58,8 @@ fn vertexMain(
 // Fragment shader program
 const fsSource = `
 struct Uniforms {
-    modelViewMatrix: mat4x4f,
     projectionMatrix: mat4x4f,
-    normalMatrix: mat4x4f,
+    viewMatrix: mat4x4f,
     lightDirection: vec3f,
     lightColor: vec3f,
     ambientColor: vec3f,
@@ -63,9 +82,6 @@ fn fragmentMain(
 /***************************** GPGPU *********************************/
 /******************************************************************* */
 
-const WIDTH = 60;
-const FISHES = WIDTH * WIDTH;
-
 document.getElementById("objects")!.innerText = FISHES.toString();
 document.getElementById("api")!.innerText = "WebGPU";
 
@@ -76,43 +92,56 @@ for (let i = 0; i < positionsBufferA.length; i += 3) {
   positionsBufferA[i + 2] = ((Math.random() - 0.5) * BOUNDS) / 4;
 }
 
-interface Buffer {
-  position: GPUBuffer;
-  color: GPUBuffer;
-  normal: GPUBuffer;
-  index: GPUBuffer;
-  numIndices: number;
+// Add velocity buffers
+let velocityBufferA = new Float32Array(FISHES * 3);
+for (let i = 0; i < velocityBufferA.length; i += 3) {
+  velocityBufferA[i + 0] = 0.5;
+  velocityBufferA[i + 1] = 0.5;
+  velocityBufferA[i + 2] = 0.5;
 }
 
-interface Uniforms {
-  modelViewMatrix: Float32Array;
-  projectionMatrix: Float32Array;
-  normalMatrix: Float32Array;
-  lightDirection: Float32Array;
-  lightColor: Float32Array;
-  ambientColor: Float32Array;
+// Add buffer swap functionality
+let positionsBufferB = new Float32Array(FISHES * 3);
+let velocityBufferB = new Float32Array(FISHES * 3);
+
+const positionsBuffers = {
+  read: positionsBufferA,
+  write: positionsBufferB,
+};
+
+const velocityBuffers = {
+  read: velocityBufferA,
+  write: velocityBufferB,
+};
+
+function swapPositionsBuffers() {
+  const temp = positionsBuffers.read;
+  positionsBuffers.read = positionsBuffers.write;
+  positionsBuffers.write = temp;
+}
+
+function swapVelocityBuffers() {
+  const temp = velocityBuffers.read;
+  velocityBuffers.read = velocityBuffers.write;
+  velocityBuffers.write = temp;
 }
 
 function createSphereGeometry(
-  position: vec3,
-  color: number[],
-  radius: number = 0.1,
+  radius: number = 0.5,
   stacks: number = 18,
   slices: number = 36
 ): {
   positions: Float32Array;
-  colors: Float32Array;
   normals: Float32Array;
   indices: Uint16Array;
 } {
   const positions: number[] = [];
-  const colors: number[] = [];
   const normals: number[] = [];
   const indices: number[] = [];
 
-  const x = position[0];
-  const y = position[1];
-  const z = position[2];
+  const x = 0;
+  const y = 0;
+  const z = 0;
 
   // Create a sphere at (x, y, z) with radius
   for (let stack = 0; stack <= stacks; ++stack) {
@@ -130,7 +159,6 @@ function createSphereGeometry(
       const z1 = z + radius * cosTheta;
 
       positions.push(x1, y1, z1);
-      colors.push(...color);
 
       // Calculate normals
       const normal = vec3.fromValues(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
@@ -151,7 +179,6 @@ function createSphereGeometry(
 
   return {
     positions: new Float32Array(positions),
-    colors: new Float32Array(colors),
     normals: new Float32Array(normals),
     indices: new Uint16Array(indices),
   };
@@ -176,7 +203,7 @@ async function main() {
   canvas.height = window.innerHeight * devicePixelRatio;
   document.body.appendChild(canvas);
 
-  const context = canvas.getContext("webgpu");
+  const context = canvas.getContext("webgpu")!;
   if (!context) {
     console.error("WebGPU context not available");
     return;
@@ -192,15 +219,18 @@ async function main() {
   // Create shader modules
   const vertexShaderModule = device.createShaderModule({
     code: vsSource,
+    label: "Vertex Shader",
   });
 
   const fragmentShaderModule = device.createShaderModule({
     code: fsSource,
+    label: "Fragment Shader",
   });
 
   // Create pipeline
   const pipeline = device.createRenderPipeline({
     layout: "auto",
+    label: "Render Pipeline",
     vertex: {
       module: vertexShaderModule,
       entryPoint: "vertexMain",
@@ -209,12 +239,6 @@ async function main() {
           arrayStride: 12, // 3 * 4 bytes
           attributes: [
             { format: "float32x3", offset: 0, shaderLocation: 0 }, // position
-          ],
-        },
-        {
-          arrayStride: 16, // 4 * 4 bytes
-          attributes: [
-            { format: "float32x4", offset: 0, shaderLocation: 1 }, // color
           ],
         },
         {
@@ -246,121 +270,206 @@ async function main() {
     size: [canvas.width, canvas.height],
     format: "depth24plus",
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    label: "Depth Texture",
   });
 
-  // Create uniform buffer
-  // Each matrix is 4x4 = 16 floats, each vector is 3 floats
-  // We need to align to 16 bytes (4 floats) for WGSL struct alignment
-  const uniformBufferSize = 16 * 4 * 3 + 16 * 3; // 3 matrices (16 floats each) + 3 vectors (4 floats each for alignment)
+  // Create uniform buffer for view/projection matrices
+  // Size calculation with proper alignment:
+  // - projectionMatrix: 16 floats (64 bytes)
+  // - viewMatrix: 16 floats (64 bytes)
+  // - lightDirection: 4 floats (16 bytes, padded from 3)
+  // - lightColor: 4 floats (16 bytes, padded from 3)
+  // - ambientColor: 4 floats (16 bytes, padded from 3)
+  const uniformBufferSize = 256; // Aligned to 256 bytes
   const uniformBuffer = device.createBuffer({
     size: uniformBufferSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    label: "Main Uniform Buffer",
   });
 
-  // Create buffers for each sphere
-  const buffers: Buffer[] = [];
+  // Create instance uniform buffer for model matrices
+  const instanceUniformBufferSize = 256; // Aligned to 256 bytes
+  const instanceUniformBuffer = device.createBuffer({
+    size: instanceUniformBufferSize * FISHES,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    label: "Instance Uniform Buffer",
+  });
+
+  // Create instance colors uniform buffer
+  const instanceColorsBufferSize = FISHES * 16; // 4 floats per color (RGBA)
+  const instanceColorsBuffer = device.createBuffer({
+    size: instanceColorsBufferSize,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    label: "Instance Colors Buffer",
+  });
+
+  // Create colors array for all instances
   const colors: number[][] = [];
-
   for (let i = 0; i < FISHES; i++) {
-    const color = [Math.random(), Math.random(), Math.random(), 1.0];
-    colors.push(color);
-    const position = vec3.fromValues(positionsBufferA[i * 3], positionsBufferA[i * 3 + 1], positionsBufferA[i * 3 + 2]);
-    const geometry = createSphereGeometry(position, color);
-
-    const positionBuffer = device.createBuffer({
-      size: geometry.positions.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
-    device.queue.writeBuffer(positionBuffer, 0, geometry.positions);
-
-    const colorBuffer = device.createBuffer({
-      size: geometry.colors.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
-    device.queue.writeBuffer(colorBuffer, 0, geometry.colors);
-
-    const normalBuffer = device.createBuffer({
-      size: geometry.normals.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
-    device.queue.writeBuffer(normalBuffer, 0, geometry.normals);
-
-    const indexBuffer = device.createBuffer({
-      size: geometry.indices.byteLength,
-      usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-    });
-    device.queue.writeBuffer(indexBuffer, 0, geometry.indices);
-
-    buffers.push({
-      position: positionBuffer,
-      color: colorBuffer,
-      normal: normalBuffer,
-      index: indexBuffer,
-      numIndices: geometry.indices.length,
-    });
+    colors.push([Math.random(), Math.random(), Math.random(), 1.0]);
   }
 
+  // Write initial colors to the buffer
+  const colorData = new Float32Array(FISHES * 4);
+  for (let i = 0; i < FISHES; i++) {
+    const color = colors[i];
+    colorData[i * 4] = color[0];
+    colorData[i * 4 + 1] = color[1];
+    colorData[i * 4 + 2] = color[2];
+    colorData[i * 4 + 3] = color[3];
+  }
+  device.queue.writeBuffer(instanceColorsBuffer, 0, colorData);
+
+  // Create a single sphere geometry at origin
+  const sphereGeometry = createSphereGeometry(1.0);
+
+  const positionBuffer = device.createBuffer({
+    size: sphereGeometry.positions.byteLength,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    label: "Position Vertex Buffer",
+  });
+  device.queue.writeBuffer(positionBuffer, 0, sphereGeometry.positions);
+
+  const normalBuffer = device.createBuffer({
+    size: sphereGeometry.normals.byteLength,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    label: "Normal Vertex Buffer",
+  });
+  device.queue.writeBuffer(normalBuffer, 0, sphereGeometry.normals);
+
+  const indexBuffer = device.createBuffer({
+    size: sphereGeometry.indices.byteLength,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+    label: "Index Buffer",
+  });
+  device.queue.writeBuffer(indexBuffer, 0, sphereGeometry.indices);
+
   const renderElement = document.getElementById("render")!;
+  const computeElement = document.getElementById("compute")!;
 
   // Create render bundle
   const bundleEncoder = device.createRenderBundleEncoder({
     colorFormats: [format],
     depthStencilFormat: "depth24plus",
+    label: "Render Bundle Encoder",
   });
 
   bundleEncoder.setPipeline(pipeline);
+
+  // Set bind group for the render bundle
   bundleEncoder.setBindGroup(
     0,
     device.createBindGroup({
       layout: pipeline.getBindGroupLayout(0),
-      entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
+      entries: [
+        { binding: 0, resource: { buffer: uniformBuffer } },
+        { binding: 1, resource: { buffer: instanceUniformBuffer } },
+        { binding: 2, resource: { buffer: instanceColorsBuffer } },
+      ],
+      label: "Render Bundle Bind Group",
     })
   );
 
-  // Record the common rendering commands in the bundle
-  for (let i = 0; i < FISHES; i++) {
-    const buffer = buffers[i];
-    bundleEncoder.setVertexBuffer(0, buffer.position);
-    bundleEncoder.setVertexBuffer(1, buffer.color);
-    bundleEncoder.setVertexBuffer(2, buffer.normal);
-    bundleEncoder.setIndexBuffer(buffer.index, "uint16");
-    bundleEncoder.drawIndexed(buffer.numIndices);
-  }
+  // Set vertex buffers
+  bundleEncoder.setVertexBuffer(0, positionBuffer);
+  bundleEncoder.setVertexBuffer(1, normalBuffer);
+  bundleEncoder.setIndexBuffer(indexBuffer, "uint16");
+
+  // Draw all instances at once
+  bundleEncoder.drawIndexed(sphereGeometry.indices.length, FISHES, 0, 0, 0);
 
   const renderBundle = bundleEncoder.finish();
 
+  // Add boids parameters
+  const separation = 5.0;
+  const alignment = 4.0;
+  const cohesion = 10.0;
+  const borderForce = 10;
+  const speed = 1 / 200;
+  let lastTime = performance.now();
+
   function render() {
+    performance.mark("compute");
+
+    // Calculate deltaTime
+    const currentTime = performance.now();
+    const deltaTime = (currentTime - lastTime) * speed;
+    lastTime = currentTime;
+
+    // Compute new positions and velocities
+    computeVelocities(
+      velocityBuffers.read,
+      velocityBuffers.write,
+      positionsBuffers.read,
+      deltaTime,
+      separation,
+      alignment,
+      cohesion,
+      currentTime,
+      borderForce,
+      BOUNDS / 2
+    );
+    swapVelocityBuffers();
+
+    computePositions(positionsBuffers.read, positionsBuffers.write, velocityBuffers.read, deltaTime);
+    swapPositionsBuffers();
+
+    const compute = performance.measure("compute", "compute");
+    computeElement.textContent = compute.duration.toFixed(2) + "ms";
+
     performance.mark("render");
 
-    const fieldOfView = (45 * Math.PI) / 180;
+    // Update view/projection matrices
+    const fieldOfView = (60 * Math.PI) / 180;
     const aspect = canvas.width / canvas.height;
     const zNear = 0.1;
-    const zFar = 100.0;
+    const zFar = 1000.0;
     const projectionMatrix = mat4.create();
     mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
 
-    const modelViewMatrix = mat4.create();
-    mat4.translate(modelViewMatrix, modelViewMatrix, [0.0, 0.0, -6.0]);
-    const normalMatrix = mat4.create();
-    mat4.invert(normalMatrix, modelViewMatrix);
-    mat4.transpose(normalMatrix, normalMatrix);
+    const viewMatrix = mat4.create();
+    mat4.translate(viewMatrix, viewMatrix, [0.0, -BOUNDS / 4, -BOUNDS]);
+    mat4.rotateX(viewMatrix, viewMatrix, Math.PI / 6);
 
-    const lightDirection = vec3.fromValues(0.5, 0.7, 1.0);
-    const lightColor = vec3.fromValues(1.0, 1.0, 1.0);
+    const lightDirection = vec3.fromValues(0.5, 0.7, 0);
+    const lightColor = vec3.fromValues(1.5, 1.5, 1.5);
     const ambientColor = vec3.fromValues(0.2, 0.2, 0.2);
 
-    // Update uniform buffer
+    // Update uniform buffer with proper alignment
     const uniformData = new Float32Array(uniformBufferSize / 4);
-    uniformData.set(modelViewMatrix, 0);
-    uniformData.set(projectionMatrix, 16);
-    uniformData.set(normalMatrix, 32);
-    uniformData.set([...lightDirection, 0], 48);
-    uniformData.set([...lightColor, 0], 52);
-    uniformData.set([...ambientColor, 0], 56);
+    // Projection matrix (16 floats)
+    uniformData.set(projectionMatrix, 0);
+    // View matrix (16 floats)
+    uniformData.set(viewMatrix, 16);
+    // Light direction (3 floats, padded to 4)
+    uniformData.set(lightDirection, 32);
+    uniformData[35] = 0; // Padding
+    // Light color (3 floats, padded to 4)
+    uniformData.set(lightColor, 36);
+    uniformData[39] = 0; // Padding
+    // Ambient color (3 floats, padded to 4)
+    uniformData.set(ambientColor, 40);
+    uniformData[43] = 0; // Padding
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
+    // Update instance matrices
+    const instanceData = new Float32Array(FISHES * 64); // 16 floats per matrix, but padded to 256 bytes
+    for (let i = 0; i < FISHES; i++) {
+      const modelMatrix = mat4.create();
+      const position = vec3.fromValues(
+        positionsBuffers.read[i * 3],
+        positionsBuffers.read[i * 3 + 1],
+        positionsBuffers.read[i * 3 + 2]
+      );
+      mat4.translate(modelMatrix, modelMatrix, position);
+      instanceData.set(modelMatrix, i * 64); // Write to the start of each 256-byte aligned block
+    }
+    device.queue.writeBuffer(instanceUniformBuffer, 0, instanceData);
+
     // Create command encoder for the current frame
-    const commandEncoder = device.createCommandEncoder();
+    const commandEncoder = device.createCommandEncoder({
+      label: "Command Encoder",
+    });
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [
         {
@@ -376,13 +485,14 @@ async function main() {
         depthLoadOp: "clear",
         depthStoreOp: "store",
       },
+      label: "Render Pass",
     });
 
-    // Execute the render bundle
     renderPass.executeBundles([renderBundle]);
-    renderPass.end();
 
+    renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
+
     const measure = performance.measure("render", "render");
     renderElement.textContent = measure.duration.toFixed(2) + "ms";
 

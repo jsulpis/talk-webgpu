@@ -133,23 +133,23 @@ export function computeVelocities(
     if (length(velocity) > SPEED_LIMIT) {
       velocity = scale(normalize(velocity), SPEED_LIMIT);
     }
-    const rotationAngle = 0.02 * Math.sin(time / 100 + (i / input.length) * 2 * Math.PI);
+    // const rotationAngle = 0.02 * Math.sin(time / 100 + (i / input.length) * 2 * Math.PI);
 
-    const cosTheta = Math.cos(rotationAngle);
-    const sinTheta = Math.sin(rotationAngle);
-    const rotationMatrix = [
-      [cosTheta, 0, sinTheta],
-      [0, 1, 0],
-      [-sinTheta, 0, cosTheta],
-    ];
+    // const cosTheta = Math.cos(rotationAngle);
+    // const sinTheta = Math.sin(rotationAngle);
+    // const rotationMatrix = [
+    //   [cosTheta, 0, sinTheta],
+    //   [0, 1, 0],
+    //   [-sinTheta, 0, cosTheta],
+    // ];
 
-    const rotatedVelocity = [
-      rotationMatrix[0][0] * velocity[0] + rotationMatrix[0][1] * velocity[1] + rotationMatrix[0][2] * velocity[2],
-      rotationMatrix[1][0] * velocity[0] + rotationMatrix[1][1] * velocity[1] + rotationMatrix[1][2] * velocity[2],
-      rotationMatrix[2][0] * velocity[0] + rotationMatrix[2][1] * velocity[1] + rotationMatrix[2][2] * velocity[2],
-    ];
-    output[i] = rotatedVelocity[0];
-    output[i + 1] = rotatedVelocity[1];
-    output[i + 2] = rotatedVelocity[2];
+    // const rotatedVelocity = [
+    //   rotationMatrix[0][0] * velocity[0] + rotationMatrix[0][1] * velocity[1] + rotationMatrix[0][2] * velocity[2],
+    //   rotationMatrix[1][0] * velocity[0] + rotationMatrix[1][1] * velocity[1] + rotationMatrix[1][2] * velocity[2],
+    //   rotationMatrix[2][0] * velocity[0] + rotationMatrix[2][1] * velocity[1] + rotationMatrix[2][2] * velocity[2],
+    // ];
+    output[i] = velocity[0];
+    output[i + 1] = velocity[1];
+    output[i + 2] = velocity[2];
   }
 }
