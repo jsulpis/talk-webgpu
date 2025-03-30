@@ -1,80 +1,61 @@
 import { mat4, vec3 } from "gl-matrix";
 import { BOUNDS, computePositions, computeVelocities } from "../gpgpu";
 
-const WIDTH = 30;
+const WIDTH = 40;
 const FISHES = WIDTH * WIDTH;
 
-// Vertex shader program
-const vsSource = `
+const shaderSource = `
+struct InstanceData {
+  modelMatrix: mat4x4f,
+  color: vec4f,
+}
+
 struct Uniforms {
-    projectionMatrix: mat4x4f,
-    viewMatrix: mat4x4f,
-    lightDirection: vec3f,
-    lightColor: vec3f,
-    ambientColor: vec3f,
+  projectionMatrix: mat4x4f,
+  viewMatrix: mat4x4f,
+  lightDirection: vec3f,
+  lightColor: vec3f,
+  ambientColor: vec3f,
 }
 @binding(0) @group(0) var<uniform> uniforms: Uniforms;
-
-struct InstanceUniforms {
-    modelMatrix: mat4x4f,
-}
-@binding(1) @group(0) var<storage> instances: array<InstanceUniforms>;
-
-struct InstanceColors {
-    colors: array<vec4f, ${FISHES}>,
-}
-@binding(2) @group(0) var<uniform> instanceColors: InstanceColors;
+@binding(1) @group(0) var<storage> instanceData: array<InstanceData>;
 
 struct VertexOutput {
-    @builtin(position) position: vec4f,
-    @location(0) color: vec4f,
-    @location(1) normal: vec3f,
-    @location(2) lightDirection: vec3f,
+  @builtin(position) position: vec4f,
+  @location(0) color: vec4f,
+  @location(1) normal: vec3f,
+  @location(2) lightDirection: vec3f,
 }
 
 @vertex
 fn vertexMain(
-    @location(0) position: vec4f,
-    @location(2) normal: vec3f,
-    @builtin(instance_index) instanceIndex: u32,
+  @location(0) position: vec4f,
+  @location(2) normal: vec3f,
+  @builtin(instance_index) instanceIndex: u32,
 ) -> VertexOutput {
-    var output: VertexOutput;
-    let modelMatrix = instances[instanceIndex].modelMatrix;
-    let modelViewMatrix = uniforms.viewMatrix * modelMatrix;
-    output.position = uniforms.projectionMatrix * modelViewMatrix * position;
+  var output: VertexOutput;
+  let instance = instanceData[instanceIndex];
+  let modelViewMatrix = uniforms.viewMatrix * instance.modelMatrix;
+  output.position = uniforms.projectionMatrix * modelViewMatrix * position;
 
-    // Transform normal to view space
-    // Since we're only using translation and rotation (no scaling),
-    // we can use the modelViewMatrix directly
-    output.normal = (modelViewMatrix * vec4f(normal, 0.0)).xyz;
+  // Transform normal to view space
+  output.normal = (modelViewMatrix * vec4f(normal, 0.0)).xyz;
 
-    // Transform light direction to view space
-    output.lightDirection = (uniforms.viewMatrix * vec4f(uniforms.lightDirection, 0.0)).xyz;
-    output.color = instanceColors.colors[instanceIndex];
-    return output;
+  // Transform light direction to view space
+  output.lightDirection = (uniforms.viewMatrix * vec4f(uniforms.lightDirection, 0.0)).xyz;
+  output.color = instance.color;
+  return output;
 }
-`;
-
-// Fragment shader program
-const fsSource = `
-struct Uniforms {
-    projectionMatrix: mat4x4f,
-    viewMatrix: mat4x4f,
-    lightDirection: vec3f,
-    lightColor: vec3f,
-    ambientColor: vec3f,
-}
-@binding(0) @group(0) var<uniform> uniforms: Uniforms;
 
 @fragment
 fn fragmentMain(
-    @location(0) color: vec4f,
-    @location(1) normal: vec3f,
-    @location(2) lightDirection: vec3f,
+  @location(0) color: vec4f,
+  @location(1) normal: vec3f,
+  @location(2) lightDirection: vec3f,
 ) -> @location(0) vec4f {
-    let light = uniforms.lightColor * color.rgb * max(dot(normal, lightDirection), 0.0);
-    let ambient = uniforms.ambientColor;
-    return vec4f((light + ambient) * color.rgb, color.a);
+  let light = uniforms.lightColor * max(dot(normal, lightDirection), 0.0);
+  let ambient = uniforms.ambientColor;
+  return vec4f((light + ambient) * color.rgb, color.a);
 }
 `;
 
@@ -216,15 +197,10 @@ async function main() {
     alphaMode: "premultiplied",
   });
 
-  // Create shader modules
-  const vertexShaderModule = device.createShaderModule({
-    code: vsSource,
-    label: "Vertex Shader",
-  });
-
-  const fragmentShaderModule = device.createShaderModule({
-    code: fsSource,
-    label: "Fragment Shader",
+  // Create shader module
+  const shaderModule = device.createShaderModule({
+    code: shaderSource,
+    label: "Combined Shader",
   });
 
   // Create pipeline
@@ -232,7 +208,7 @@ async function main() {
     layout: "auto",
     label: "Render Pipeline",
     vertex: {
-      module: vertexShaderModule,
+      module: shaderModule,
       entryPoint: "vertexMain",
       buffers: [
         {
@@ -250,7 +226,7 @@ async function main() {
       ],
     },
     fragment: {
-      module: fragmentShaderModule,
+      module: shaderModule,
       entryPoint: "fragmentMain",
       targets: [{ format }],
     },
@@ -272,53 +248,6 @@ async function main() {
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
     label: "Depth Texture",
   });
-
-  // Create uniform buffer for view/projection matrices
-  // Size calculation with proper alignment:
-  // - projectionMatrix: 16 floats (64 bytes)
-  // - viewMatrix: 16 floats (64 bytes)
-  // - lightDirection: 4 floats (16 bytes, padded from 3)
-  // - lightColor: 4 floats (16 bytes, padded from 3)
-  // - ambientColor: 4 floats (16 bytes, padded from 3)
-  const uniformBufferSize = 256; // Aligned to 256 bytes
-  const uniformBuffer = device.createBuffer({
-    size: uniformBufferSize,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    label: "Main Uniform Buffer",
-  });
-
-  // Create instance uniform buffer for model matrices
-  const instanceUniformBufferSize = 256; // Aligned to 256 bytes
-  const instanceUniformBuffer = device.createBuffer({
-    size: instanceUniformBufferSize * FISHES,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    label: "Instance Uniform Buffer",
-  });
-
-  // Create instance colors uniform buffer
-  const instanceColorsBufferSize = FISHES * 16; // 4 floats per color (RGBA)
-  const instanceColorsBuffer = device.createBuffer({
-    size: instanceColorsBufferSize,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    label: "Instance Colors Buffer",
-  });
-
-  // Create colors array for all instances
-  const colors: number[][] = [];
-  for (let i = 0; i < FISHES; i++) {
-    colors.push([Math.random(), Math.random(), Math.random(), 1.0]);
-  }
-
-  // Write initial colors to the buffer
-  const colorData = new Float32Array(FISHES * 4);
-  for (let i = 0; i < FISHES; i++) {
-    const color = colors[i];
-    colorData[i * 4] = color[0];
-    colorData[i * 4 + 1] = color[1];
-    colorData[i * 4 + 2] = color[2];
-    colorData[i * 4 + 3] = color[3];
-  }
-  device.queue.writeBuffer(instanceColorsBuffer, 0, colorData);
 
   // Create a single sphere geometry at origin
   const sphereGeometry = createSphereGeometry(1.0);
@@ -344,42 +273,6 @@ async function main() {
   });
   device.queue.writeBuffer(indexBuffer, 0, sphereGeometry.indices);
 
-  const renderElement = document.getElementById("render")!;
-  const computeElement = document.getElementById("compute")!;
-
-  // Create render bundle
-  const bundleEncoder = device.createRenderBundleEncoder({
-    colorFormats: [format],
-    depthStencilFormat: "depth24plus",
-    label: "Render Bundle Encoder",
-  });
-
-  bundleEncoder.setPipeline(pipeline);
-
-  // Set bind group for the render bundle
-  bundleEncoder.setBindGroup(
-    0,
-    device.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: uniformBuffer } },
-        { binding: 1, resource: { buffer: instanceUniformBuffer } },
-        { binding: 2, resource: { buffer: instanceColorsBuffer } },
-      ],
-      label: "Render Bundle Bind Group",
-    })
-  );
-
-  // Set vertex buffers
-  bundleEncoder.setVertexBuffer(0, positionBuffer);
-  bundleEncoder.setVertexBuffer(1, normalBuffer);
-  bundleEncoder.setIndexBuffer(indexBuffer, "uint16");
-
-  // Draw all instances at once
-  bundleEncoder.drawIndexed(sphereGeometry.indices.length, FISHES, 0, 0, 0);
-
-  const renderBundle = bundleEncoder.finish();
-
   // Add boids parameters
   const separation = 5.0;
   const alignment = 4.0;
@@ -388,7 +281,60 @@ async function main() {
   const speed = 1 / 200;
   let lastTime = performance.now();
 
-  function render() {
+  // Create uniform buffer for view/projection matrices and lighting
+  const uniformBufferSize = 192; // Size for:
+  // - projectionMatrix (mat4x4f): 64 bytes
+  // - viewMatrix (mat4x4f): 64 bytes
+  // - lightDirection (vec3f + padding): 16 bytes
+  // - lightColor (vec3f + padding): 16 bytes
+  // - ambientColor (vec3f + padding): 16 bytes
+  // Total: 192 bytes, aligned to 256-byte boundary
+  const uniformBuffer = device.createBuffer({
+    size: uniformBufferSize,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    label: "Uniform Buffer",
+  });
+
+  // Create storage buffer for instance data
+  const instanceDataSize = FISHES * 80; // Size for each instance:
+  // - modelMatrix (mat4x4f): 64 bytes
+  // - color (vec4f): 16 bytes
+  // Total per instance: 80 bytes
+  const instanceDataBuffer = device.createBuffer({
+    size: instanceDataSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    label: "Instance Data Buffer",
+  });
+
+  const bindGroup = device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } },
+      { binding: 1, resource: { buffer: instanceDataBuffer } },
+    ],
+    label: "Bind Group",
+  });
+
+  // Create colors array for all instances
+  const colors: number[][] = [];
+  for (let i = 0; i < FISHES; i++) {
+    colors.push([Math.random(), Math.random(), Math.random(), 1.0]);
+  }
+
+  // Create a single Float32Array for all instance colors
+  const instanceColors = new Float32Array(FISHES * 4);
+  for (let i = 0; i < FISHES; i++) {
+    const color = colors[i];
+    instanceColors[i * 4] = color[0];
+    instanceColors[i * 4 + 1] = color[1];
+    instanceColors[i * 4 + 2] = color[2];
+    instanceColors[i * 4 + 3] = color[3];
+  }
+
+  const renderElement = document.getElementById("render")!;
+  const computeElement = document.getElementById("compute")!;
+
+  async function render() {
     performance.mark("compute");
 
     // Calculate deltaTime
@@ -435,7 +381,7 @@ async function main() {
     const lightColor = vec3.fromValues(1.5, 1.5, 1.5);
     const ambientColor = vec3.fromValues(0.2, 0.2, 0.2);
 
-    // Update uniform buffer with proper alignment
+    // Update uniforms
     const uniformData = new Float32Array(uniformBufferSize / 4);
     // Projection matrix (16 floats)
     uniformData.set(projectionMatrix, 0);
@@ -450,10 +396,9 @@ async function main() {
     // Ambient color (3 floats, padded to 4)
     uniformData.set(ambientColor, 40);
     uniformData[43] = 0; // Padding
-    device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
-    // Update instance matrices
-    const instanceData = new Float32Array(FISHES * 64); // 16 floats per matrix, but padded to 256 bytes
+    // Update instance data
+    const instanceData = new Float32Array(instanceDataSize / 4);
     for (let i = 0; i < FISHES; i++) {
       const modelMatrix = mat4.create();
       const position = vec3.fromValues(
@@ -462,13 +407,21 @@ async function main() {
         positionsBuffers.read[i * 3 + 2]
       );
       mat4.translate(modelMatrix, modelMatrix, position);
-      instanceData.set(modelMatrix, i * 64); // Write to the start of each 256-byte aligned block
-    }
-    device.queue.writeBuffer(instanceUniformBuffer, 0, instanceData);
 
-    // Create command encoder for the current frame
+      // Model matrix (16 floats)
+      instanceData.set(modelMatrix, i * 20);
+      // Color (4 floats)
+      const instanceColor = instanceColors.slice(i * 4, (i + 1) * 4);
+      instanceData.set(instanceColor, i * 20 + 16);
+    }
+
+    // Write data to GPU buffers
+    device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+    device.queue.writeBuffer(instanceDataBuffer, 0, instanceData);
+
+    // Create command encoder for rendering
     const commandEncoder = device.createCommandEncoder({
-      label: "Command Encoder",
+      label: "Render Command Encoder",
     });
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [
@@ -488,7 +441,14 @@ async function main() {
       label: "Render Pass",
     });
 
-    renderPass.executeBundles([renderBundle]);
+    renderPass.setPipeline(pipeline);
+    renderPass.setBindGroup(0, bindGroup);
+
+    renderPass.setVertexBuffer(0, positionBuffer);
+    renderPass.setVertexBuffer(1, normalBuffer);
+    renderPass.setIndexBuffer(indexBuffer, "uint16");
+
+    renderPass.drawIndexed(sphereGeometry.indices.length, FISHES, 0, 0, 0);
 
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
