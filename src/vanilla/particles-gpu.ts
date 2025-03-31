@@ -1,10 +1,10 @@
 import { mat4, vec3 } from "gl-matrix";
-import { BOUNDS } from "../gpgpu";
 import { useBoidsGPU } from "../boids/webgpu";
 import { useBoidsCPU } from "../boids/cpu";
+import { createSphereGeometry } from "./sphere";
 
-const WIDTH = 20;
-const FISHES = WIDTH * WIDTH;
+const COUNT = 400;
+const BOUNDS = 100;
 
 const shaderSource = `
 struct InstanceData {
@@ -62,13 +62,13 @@ fn fragmentMain(
 `;
 
 /******************************************************************* */
-/***************************** GPGPU *********************************/
+/***************************** INIT **********************************/
 /******************************************************************* */
 
-document.getElementById("objects")!.innerText = FISHES.toString();
+document.getElementById("objects")!.innerText = COUNT.toString();
 document.getElementById("api")!.innerText = "WebGPU";
 
-let initialPositions = new Float32Array(FISHES * 3);
+let initialPositions = new Float32Array(COUNT * 3);
 for (let i = 0; i < initialPositions.length; i += 3) {
   initialPositions[i + 0] = ((Math.random() - 0.5) * BOUNDS) / 2;
   initialPositions[i + 1] = ((Math.random() - 0.5) * BOUNDS) / 2;
@@ -76,69 +76,11 @@ for (let i = 0; i < initialPositions.length; i += 3) {
 }
 
 // Add velocity buffers
-let initialVelocities = new Float32Array(FISHES * 3);
+let initialVelocities = new Float32Array(COUNT * 3);
 for (let i = 0; i < initialVelocities.length; i += 3) {
   initialVelocities[i + 0] = Math.random() * 0.5;
   initialVelocities[i + 1] = Math.random() * 0.5;
   initialVelocities[i + 2] = Math.random() * 0.5;
-}
-
-function createSphereGeometry(
-  radius: number = 0.5,
-  stacks: number = 18,
-  slices: number = 36
-): {
-  positions: Float32Array;
-  normals: Float32Array;
-  indices: Uint16Array;
-} {
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const indices: number[] = [];
-
-  const x = 0;
-  const y = 0;
-  const z = 0;
-
-  // Create a sphere at (x, y, z) with radius
-  for (let stack = 0; stack <= stacks; ++stack) {
-    const theta = (stack * Math.PI) / stacks;
-    const sinTheta = Math.sin(theta);
-    const cosTheta = Math.cos(theta);
-
-    for (let slice = 0; slice <= slices; ++slice) {
-      const phi = (slice * 2 * Math.PI) / slices;
-      const sinPhi = Math.sin(phi);
-      const cosPhi = Math.cos(phi);
-
-      const x1 = x + radius * sinTheta * cosPhi;
-      const y1 = y + radius * sinTheta * sinPhi;
-      const z1 = z + radius * cosTheta;
-
-      positions.push(x1, y1, z1);
-
-      // Calculate normals
-      const normal = vec3.fromValues(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
-      normals.push(...normal);
-    }
-  }
-
-  // Generate indices for the sphere
-  for (let stack = 0; stack < stacks; ++stack) {
-    for (let slice = 0; slice < slices; ++slice) {
-      const first = stack * (slices + 1) + slice;
-      const second = first + slices + 1;
-
-      indices.push(first, second, first + 1);
-      indices.push(second, second + 1, first + 1);
-    }
-  }
-
-  return {
-    positions: new Float32Array(positions),
-    normals: new Float32Array(normals),
-    indices: new Uint16Array(indices),
-  };
 }
 
 async function main() {
@@ -173,13 +115,11 @@ async function main() {
     alphaMode: "premultiplied",
   });
 
-  // Create shader module
   const shaderModule = device.createShaderModule({
     code: shaderSource,
     label: "Combined Shader",
   });
 
-  // Create pipeline
   const pipeline = device.createRenderPipeline({
     layout: "auto",
     label: "Render Pipeline",
@@ -217,7 +157,6 @@ async function main() {
     },
   });
 
-  // Create depth texture
   const depthTexture = device.createTexture({
     size: [canvas.width, canvas.height],
     format: "depth24plus",
@@ -225,7 +164,6 @@ async function main() {
     label: "Depth Texture",
   });
 
-  // Create a single sphere geometry at origin
   const sphereGeometry = createSphereGeometry(1.0);
 
   const positionBuffer = device.createBuffer({
@@ -249,7 +187,7 @@ async function main() {
   });
   device.queue.writeBuffer(indexBuffer, 0, sphereGeometry.indices);
 
-  // Add boids parameters
+  // boids parameters
   const separation = 5.0;
   const alignment = 4.0;
   const cohesion = 10.0;
@@ -272,7 +210,7 @@ async function main() {
   });
 
   // Create storage buffer for instance data
-  const instanceDataSize = FISHES * 80; // Size for each instance:
+  const instanceDataSize = COUNT * 80; // Size for each instance:
   // - modelMatrix (mat4x4f): 64 bytes
   // - color (vec4f): 16 bytes
   // Total per instance: 80 bytes
@@ -291,32 +229,27 @@ async function main() {
     label: "Bind Group",
   });
 
-  // Create colors array for all instances
-  const colors: number[][] = [];
-  for (let i = 0; i < FISHES; i++) {
-    colors.push([Math.random(), Math.random(), Math.random(), 1.0]);
-  }
-
-  // Create a single Float32Array for all instance colors
-  const instanceColors = new Float32Array(FISHES * 4);
-  for (let i = 0; i < FISHES; i++) {
-    const color = colors[i];
-    instanceColors[i * 4] = color[0];
-    instanceColors[i * 4 + 1] = color[1];
-    instanceColors[i * 4 + 2] = color[2];
-    instanceColors[i * 4 + 3] = color[3];
+  const instanceColors = new Float32Array(COUNT * 4);
+  for (let i = 0; i < COUNT; i++) {
+    instanceColors[i * 4] = Math.random();
+    instanceColors[i * 4 + 1] = Math.random();
+    instanceColors[i * 4 + 2] = Math.random();
+    instanceColors[i * 4 + 3] = 1;
   }
 
   const renderElement = document.getElementById("render")!;
   const computeElement = document.getElementById("compute")!;
 
   // const computeBoids = useBoidsCPU(initialPositions, initialVelocities, FISHES).compute;
-  const computeBoids = useBoidsGPU(device, initialPositions, initialVelocities, FISHES, BOUNDS).compute;
+  const computeBoids = useBoidsGPU(device, initialPositions, initialVelocities, COUNT, BOUNDS).compute;
+
+  /******************************************************************* */
+  /***************************** RENDER ********************************/
+  /******************************************************************* */
 
   async function render() {
     performance.mark("compute");
 
-    // Calculate deltaTime
     const currentTime = performance.now();
     const deltaTime = (currentTime - lastTime) * speed;
     lastTime = currentTime;
@@ -355,23 +288,18 @@ async function main() {
 
     // Update uniforms
     const uniformData = new Float32Array(uniformBufferSize / 4);
-    // Projection matrix (16 floats)
-    uniformData.set(projectionMatrix, 0);
-    // View matrix (16 floats)
-    uniformData.set(viewMatrix, 16);
-    // Light direction (3 floats, padded to 4)
-    uniformData.set(lightDirection, 32);
-    uniformData[35] = 0; // Padding
-    // Light color (3 floats, padded to 4)
-    uniformData.set(lightColor, 36);
-    uniformData[39] = 0; // Padding
-    // Ambient color (3 floats, padded to 4)
-    uniformData.set(ambientColor, 40);
-    uniformData[43] = 0; // Padding
+    uniformData.set(projectionMatrix, 0); // 16 floats
+    uniformData.set(viewMatrix, 16); // 16 floats
+    uniformData.set(lightDirection, 32); // 3 floats, padded to 4
+    uniformData[35] = 0;
+    uniformData.set(lightColor, 36); // 3 floats, padded to 4
+    uniformData[39] = 0;
+    uniformData.set(ambientColor, 40); // 3 floats, padded to 4
+    uniformData[43] = 0;
 
     // Update instance data
     const instanceData = new Float32Array(instanceDataSize / 4);
-    for (let i = 0; i < FISHES; i++) {
+    for (let i = 0; i < COUNT; i++) {
       const modelMatrix = mat4.create();
       const position = vec3.fromValues(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
       mat4.translate(modelMatrix, modelMatrix, position);
@@ -413,7 +341,7 @@ async function main() {
     renderPass.setVertexBuffer(1, normalBuffer);
     renderPass.setIndexBuffer(indexBuffer, "uint16");
 
-    renderPass.drawIndexed(sphereGeometry.indices.length, FISHES, 0, 0, 0);
+    renderPass.drawIndexed(sphereGeometry.indices.length, COUNT, 0, 0, 0);
 
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
