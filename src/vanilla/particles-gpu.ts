@@ -1,7 +1,9 @@
 import { mat4, vec3 } from "gl-matrix";
-import { BOUNDS, computePositions, computeVelocities } from "../gpgpu";
+import { BOUNDS } from "../gpgpu";
+import { useBoidsGPU } from "../boids/webgpu";
+import { useBoidsCPU } from "../boids/cpu";
 
-const WIDTH = 40;
+const WIDTH = 20;
 const FISHES = WIDTH * WIDTH;
 
 const shaderSource = `
@@ -66,45 +68,19 @@ fn fragmentMain(
 document.getElementById("objects")!.innerText = FISHES.toString();
 document.getElementById("api")!.innerText = "WebGPU";
 
-let positionsBufferA = new Float32Array(FISHES * 3);
-for (let i = 0; i < positionsBufferA.length; i += 3) {
-  positionsBufferA[i + 0] = ((Math.random() - 0.5) * BOUNDS) / 4;
-  positionsBufferA[i + 1] = ((Math.random() - 0.5) * BOUNDS) / 4;
-  positionsBufferA[i + 2] = ((Math.random() - 0.5) * BOUNDS) / 4;
+let initialPositions = new Float32Array(FISHES * 3);
+for (let i = 0; i < initialPositions.length; i += 3) {
+  initialPositions[i + 0] = ((Math.random() - 0.5) * BOUNDS) / 2;
+  initialPositions[i + 1] = ((Math.random() - 0.5) * BOUNDS) / 2;
+  initialPositions[i + 2] = ((Math.random() - 0.5) * BOUNDS) / 2;
 }
 
 // Add velocity buffers
-let velocityBufferA = new Float32Array(FISHES * 3);
-for (let i = 0; i < velocityBufferA.length; i += 3) {
-  velocityBufferA[i + 0] = 0.5;
-  velocityBufferA[i + 1] = 0.5;
-  velocityBufferA[i + 2] = 0.5;
-}
-
-// Add buffer swap functionality
-let positionsBufferB = new Float32Array(FISHES * 3);
-let velocityBufferB = new Float32Array(FISHES * 3);
-
-const positionsBuffers = {
-  read: positionsBufferA,
-  write: positionsBufferB,
-};
-
-const velocityBuffers = {
-  read: velocityBufferA,
-  write: velocityBufferB,
-};
-
-function swapPositionsBuffers() {
-  const temp = positionsBuffers.read;
-  positionsBuffers.read = positionsBuffers.write;
-  positionsBuffers.write = temp;
-}
-
-function swapVelocityBuffers() {
-  const temp = velocityBuffers.read;
-  velocityBuffers.read = velocityBuffers.write;
-  velocityBuffers.write = temp;
+let initialVelocities = new Float32Array(FISHES * 3);
+for (let i = 0; i < initialVelocities.length; i += 3) {
+  initialVelocities[i + 0] = Math.random() * 0.5;
+  initialVelocities[i + 1] = Math.random() * 0.5;
+  initialVelocities[i + 2] = Math.random() * 0.5;
 }
 
 function createSphereGeometry(
@@ -334,6 +310,9 @@ async function main() {
   const renderElement = document.getElementById("render")!;
   const computeElement = document.getElementById("compute")!;
 
+  // const computeBoids = useBoidsCPU(initialPositions, initialVelocities, FISHES).compute;
+  const computeBoids = useBoidsGPU(device, initialPositions, initialVelocities, FISHES, BOUNDS).compute;
+
   async function render() {
     performance.mark("compute");
 
@@ -342,23 +321,16 @@ async function main() {
     const deltaTime = (currentTime - lastTime) * speed;
     lastTime = currentTime;
 
-    // Compute new positions and velocities
-    computeVelocities(
-      velocityBuffers.read,
-      velocityBuffers.write,
-      positionsBuffers.read,
+    const { positions } = await computeBoids({
       deltaTime,
       separation,
       alignment,
       cohesion,
       currentTime,
+      bounds: BOUNDS,
       borderForce,
-      BOUNDS / 2
-    );
-    swapVelocityBuffers();
-
-    computePositions(positionsBuffers.read, positionsBuffers.write, velocityBuffers.read, deltaTime);
-    swapPositionsBuffers();
+      borderDistance: BOUNDS / 2,
+    });
 
     const compute = performance.measure("compute", "compute");
     computeElement.textContent = compute.duration.toFixed(2) + "ms";
@@ -401,18 +373,11 @@ async function main() {
     const instanceData = new Float32Array(instanceDataSize / 4);
     for (let i = 0; i < FISHES; i++) {
       const modelMatrix = mat4.create();
-      const position = vec3.fromValues(
-        positionsBuffers.read[i * 3],
-        positionsBuffers.read[i * 3 + 1],
-        positionsBuffers.read[i * 3 + 2]
-      );
+      const position = vec3.fromValues(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
       mat4.translate(modelMatrix, modelMatrix, position);
 
-      // Model matrix (16 floats)
       instanceData.set(modelMatrix, i * 20);
-      // Color (4 floats)
-      const instanceColor = instanceColors.slice(i * 4, (i + 1) * 4);
-      instanceData.set(instanceColor, i * 20 + 16);
+      instanceData.set(instanceColors.slice(i * 4, i * 4 + 4), i * 20 + 16);
     }
 
     // Write data to GPU buffers

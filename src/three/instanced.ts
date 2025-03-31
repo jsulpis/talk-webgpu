@@ -17,7 +17,7 @@ scene.background = new THREE.Color("#def");
 
 const material = new THREE.MeshNormalMaterial();
 
-let mesh;
+let mesh: THREE.InstancedMesh;
 
 const loader = new THREE.BufferGeometryLoader();
 loader.load("suzanne.json", function (geometry) {
