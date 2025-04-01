@@ -3,15 +3,10 @@ import { useBoidsGPU } from "../boids/webgpu";
 import { useBoidsCPU } from "../boids/cpu";
 import { createSphereGeometry } from "./sphere";
 
-const COUNT = 400;
+const COUNT = 10000;
 const BOUNDS = 100;
 
 const shaderSource = `
-struct InstanceData {
-  modelMatrix: mat4x4f,
-  color: vec4f,
-}
-
 struct Uniforms {
   projectionMatrix: mat4x4f,
   viewMatrix: mat4x4f,
@@ -20,7 +15,8 @@ struct Uniforms {
   ambientColor: vec3f,
 }
 @binding(0) @group(0) var<uniform> uniforms: Uniforms;
-@binding(1) @group(0) var<storage> instanceData: array<InstanceData>;
+@binding(1) @group(0) var<storage, read> positions: array<vec3f>;
+@binding(2) @group(0) var<storage, read> colors: array<vec4f>;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -32,12 +28,18 @@ struct VertexOutput {
 @vertex
 fn vertexMain(
   @location(0) position: vec4f,
-  @location(2) normal: vec3f,
+  @location(1) normal: vec3f,
   @builtin(instance_index) instanceIndex: u32,
 ) -> VertexOutput {
   var output: VertexOutput;
-  let instance = instanceData[instanceIndex];
-  let modelViewMatrix = uniforms.viewMatrix * instance.modelMatrix;
+  let worldPosition = vec4f(positions[instanceIndex], 1.0);
+  let modelMatrix = mat4x4f(
+    1.0, 0.0, 0.0, 0.0,
+    0.0, 1.0, 0.0, 0.0,
+    0.0, 0.0, 1.0, 0.0,
+    worldPosition.x, worldPosition.y, worldPosition.z, 1.0
+  );
+  let modelViewMatrix = uniforms.viewMatrix * modelMatrix;
   output.position = uniforms.projectionMatrix * modelViewMatrix * position;
 
   // Transform normal to view space
@@ -45,7 +47,7 @@ fn vertexMain(
 
   // Transform light direction to view space
   output.lightDirection = (uniforms.viewMatrix * vec4f(uniforms.lightDirection, 0.0)).xyz;
-  output.color = instance.color;
+  output.color = colors[instanceIndex];
   return output;
 }
 
@@ -120,8 +122,38 @@ async function main() {
     label: "Combined Shader",
   });
 
+  const renderBindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        buffer: {
+          type: "uniform",
+        },
+      },
+      {
+        binding: 1, // positions
+        visibility: GPUShaderStage.VERTEX,
+        buffer: {
+          type: "read-only-storage",
+        },
+      },
+      {
+        binding: 2, // colors
+        visibility: GPUShaderStage.VERTEX,
+        buffer: {
+          type: "read-only-storage",
+        },
+      },
+    ],
+  });
+
+  const pipelineLayout = device.createPipelineLayout({
+    bindGroupLayouts: [renderBindGroupLayout],
+  });
+
   const pipeline = device.createRenderPipeline({
-    layout: "auto",
+    layout: pipelineLayout,
     label: "Render Pipeline",
     vertex: {
       module: shaderModule,
@@ -136,7 +168,7 @@ async function main() {
         {
           arrayStride: 12, // 3 * 4 bytes
           attributes: [
-            { format: "float32x3", offset: 0, shaderLocation: 2 }, // normal
+            { format: "float32x3", offset: 0, shaderLocation: 1 }, // normal
           ],
         },
       ],
@@ -180,6 +212,21 @@ async function main() {
   });
   device.queue.writeBuffer(normalBuffer, 0, sphereGeometry.normals);
 
+  const colors = new Float32Array(COUNT * 4);
+  for (let i = 0; i < COUNT; i++) {
+    colors[i * 4] = Math.random();
+    colors[i * 4 + 1] = Math.random();
+    colors[i * 4 + 2] = Math.random();
+    colors[i * 4 + 3] = 1;
+  }
+
+  const colorsBuffer = device.createBuffer({
+    size: colors.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    label: "Colors Storage Buffer",
+  });
+  device.queue.writeBuffer(colorsBuffer, 0, colors);
+
   const indexBuffer = device.createBuffer({
     size: sphereGeometry.indices.byteLength,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
@@ -209,110 +256,47 @@ async function main() {
     label: "Uniform Buffer",
   });
 
-  // Create storage buffer for instance data
-  const instanceDataSize = COUNT * 80; // Size for each instance:
-  // - modelMatrix (mat4x4f): 64 bytes
-  // - color (vec4f): 16 bytes
-  // Total per instance: 80 bytes
-  const instanceDataBuffer = device.createBuffer({
-    size: instanceDataSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    label: "Instance Data Buffer",
-  });
+  // Update view/projection matrices
+  const fieldOfView = (60 * Math.PI) / 180;
+  const aspect = canvas.width / canvas.height;
+  const zNear = 0.1;
+  const zFar = 1000.0;
+  const projectionMatrix = mat4.create();
+  mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
 
-  const bindGroup = device.createBindGroup({
-    layout: pipeline.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: instanceDataBuffer } },
-    ],
-    label: "Bind Group",
-  });
+  const viewMatrix = mat4.create();
+  mat4.translate(viewMatrix, viewMatrix, [0.0, -BOUNDS / 4, -BOUNDS]);
+  mat4.rotateX(viewMatrix, viewMatrix, Math.PI / 6);
 
-  const instanceColors = new Float32Array(COUNT * 4);
-  for (let i = 0; i < COUNT; i++) {
-    instanceColors[i * 4] = Math.random();
-    instanceColors[i * 4 + 1] = Math.random();
-    instanceColors[i * 4 + 2] = Math.random();
-    instanceColors[i * 4 + 3] = 1;
-  }
+  const lightDirection = vec3.fromValues(0.5, 0.7, 0);
+  const lightColor = vec3.fromValues(1.5, 1.5, 1.5);
+  const ambientColor = vec3.fromValues(0.2, 0.2, 0.2);
+
+  // Update uniforms
+  const uniformData = new Float32Array(uniformBufferSize / 4);
+  uniformData.set(projectionMatrix, 0); // 16 floats
+  uniformData.set(viewMatrix, 16); // 16 floats
+  uniformData.set(lightDirection, 32); // 3 floats, padded to 4
+  uniformData[35] = 0;
+  uniformData.set(lightColor, 36); // 3 floats, padded to 4
+  uniformData[39] = 0;
+  uniformData.set(ambientColor, 40); // 3 floats, padded to 4
+  uniformData[43] = 0;
+
+  device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
   const renderElement = document.getElementById("render")!;
   const computeElement = document.getElementById("compute")!;
+  const jsElement = document.getElementById("js")!;
 
   // const computeBoids = useBoidsCPU(initialPositions, initialVelocities, FISHES).compute;
-  const computeBoids = useBoidsGPU(device, initialPositions, initialVelocities, COUNT, BOUNDS).compute;
+  const computeBoids = useBoidsGPU(device, initialPositions, initialVelocities, COUNT).compute;
 
   /******************************************************************* */
   /***************************** RENDER ********************************/
   /******************************************************************* */
 
-  async function render() {
-    performance.mark("compute");
-
-    const currentTime = performance.now();
-    const deltaTime = (currentTime - lastTime) * speed;
-    lastTime = currentTime;
-
-    const { positions } = await computeBoids({
-      deltaTime,
-      separation,
-      alignment,
-      cohesion,
-      currentTime,
-      bounds: BOUNDS,
-      borderForce,
-      borderDistance: BOUNDS / 2,
-    });
-
-    const compute = performance.measure("compute", "compute");
-    computeElement.textContent = compute.duration.toFixed(2) + "ms";
-
-    performance.mark("render");
-
-    // Update view/projection matrices
-    const fieldOfView = (60 * Math.PI) / 180;
-    const aspect = canvas.width / canvas.height;
-    const zNear = 0.1;
-    const zFar = 1000.0;
-    const projectionMatrix = mat4.create();
-    mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
-
-    const viewMatrix = mat4.create();
-    mat4.translate(viewMatrix, viewMatrix, [0.0, -BOUNDS / 4, -BOUNDS]);
-    mat4.rotateX(viewMatrix, viewMatrix, Math.PI / 6);
-
-    const lightDirection = vec3.fromValues(0.5, 0.7, 0);
-    const lightColor = vec3.fromValues(1.5, 1.5, 1.5);
-    const ambientColor = vec3.fromValues(0.2, 0.2, 0.2);
-
-    // Update uniforms
-    const uniformData = new Float32Array(uniformBufferSize / 4);
-    uniformData.set(projectionMatrix, 0); // 16 floats
-    uniformData.set(viewMatrix, 16); // 16 floats
-    uniformData.set(lightDirection, 32); // 3 floats, padded to 4
-    uniformData[35] = 0;
-    uniformData.set(lightColor, 36); // 3 floats, padded to 4
-    uniformData[39] = 0;
-    uniformData.set(ambientColor, 40); // 3 floats, padded to 4
-    uniformData[43] = 0;
-
-    // Update instance data
-    const instanceData = new Float32Array(instanceDataSize / 4);
-    for (let i = 0; i < COUNT; i++) {
-      const modelMatrix = mat4.create();
-      const position = vec3.fromValues(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-      mat4.translate(modelMatrix, modelMatrix, position);
-
-      instanceData.set(modelMatrix, i * 20);
-      instanceData.set(instanceColors.slice(i * 4, i * 4 + 4), i * 20 + 16);
-    }
-
-    // Write data to GPU buffers
-    device.queue.writeBuffer(uniformBuffer, 0, uniformData);
-    device.queue.writeBuffer(instanceDataBuffer, 0, instanceData);
-
-    // Create command encoder for rendering
+  function drawScene(positionsBuffer: GPUBuffer) {
     const commandEncoder = device.createCommandEncoder({
       label: "Render Command Encoder",
     });
@@ -320,14 +304,14 @@ async function main() {
       colorAttachments: [
         {
           view: context.getCurrentTexture().createView(),
-          clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
           loadOp: "clear",
           storeOp: "store",
         },
       ],
       depthStencilAttachment: {
         view: depthTexture.createView(),
-        depthClearValue: 1.0,
+        depthClearValue: 1,
         depthLoadOp: "clear",
         depthStoreOp: "store",
       },
@@ -335,6 +319,16 @@ async function main() {
     });
 
     renderPass.setPipeline(pipeline);
+
+    const bindGroup = device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: uniformBuffer } },
+        { binding: 1, resource: { buffer: positionsBuffer } },
+        { binding: 2, resource: { buffer: colorsBuffer } },
+      ],
+      label: "Render Bind Group",
+    });
     renderPass.setBindGroup(0, bindGroup);
 
     renderPass.setVertexBuffer(0, positionBuffer);
@@ -345,13 +339,43 @@ async function main() {
 
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
-
-    const measure = performance.measure("render", "render");
-    renderElement.textContent = measure.duration.toFixed(2) + "ms";
-
-    requestAnimationFrame(render);
   }
-  requestAnimationFrame(render);
+
+  function render() {
+    performance.mark("compute");
+    performance.mark("js");
+
+    const currentTime = performance.now();
+    const deltaTime = (currentTime - lastTime) * speed;
+    lastTime = currentTime;
+
+    computeBoids({
+      deltaTime,
+      separation,
+      alignment,
+      cohesion,
+      borderForce,
+      borderDistance: BOUNDS / 2,
+      unpack: false,
+    }).then(({ positionsBuffer }) => {
+      const compute = performance.measure("compute", "compute");
+      computeElement.textContent = compute.duration.toFixed(2) + "ms";
+
+      performance.mark("render");
+
+      drawScene(positionsBuffer);
+
+      const measure = performance.measure("render", "render");
+      renderElement.textContent = measure.duration.toFixed(2) + "ms";
+
+      requestAnimationFrame(render);
+    });
+
+    const measure = performance.measure("js", "js");
+    jsElement.textContent = measure.duration.toFixed(2) + "ms";
+  }
+
+  render();
 }
 
 window.onload = main;

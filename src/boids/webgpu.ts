@@ -121,8 +121,7 @@ export function useBoidsGPU(
   device: GPUDevice,
   initialPositions: Float32Array,
   initialVelocities: Float32Array,
-  FISHES: number,
-  BOUNDS: number
+  COUNT: number
 ) {
   // Create compute pipeline
   const computePipeline = device.createComputePipeline({
@@ -138,14 +137,14 @@ export function useBoidsGPU(
 
   // Create aligned buffers
   // Pour vec3f, WebGPU nécessite un alignement sur 16 octets (4 float par élément)
-  const positionsSize = FISHES * 4 * Float32Array.BYTES_PER_ELEMENT; // 4 floats per position (xyz + padding)
-  const velocitiesSize = FISHES * 4 * Float32Array.BYTES_PER_ELEMENT; // 4 floats per velocity (xyz + padding)
+  const positionsSize = COUNT * 4 * Float32Array.BYTES_PER_ELEMENT; // 4 floats per position (xyz + padding)
+  const velocitiesSize = COUNT * 4 * Float32Array.BYTES_PER_ELEMENT; // 4 floats per velocity (xyz + padding)
 
   // Convertir les tableaux d'entrée au format aligné (x,y,z,0, x,y,z,0, ...)
-  const alignedPositions = new Float32Array(FISHES * 4);
-  const alignedVelocities = new Float32Array(FISHES * 4);
+  const alignedPositions = new Float32Array(COUNT * 4);
+  const alignedVelocities = new Float32Array(COUNT * 4);
 
-  for (let i = 0; i < FISHES; i++) {
+  for (let i = 0; i < COUNT; i++) {
     // Copier chaque position vec3 avec padding
     alignedPositions[i * 4] = initialPositions[i * 3]; // x
     alignedPositions[i * 4 + 1] = initialPositions[i * 3 + 1]; // y
@@ -235,30 +234,29 @@ export function useBoidsGPU(
     separation,
     alignment,
     cohesion,
-    currentTime,
     borderForce,
     borderDistance,
-    bounds,
+    unpack,
   }: {
     deltaTime: number;
     separation: number;
     alignment: number;
     cohesion: number;
-    currentTime: number;
     borderForce: number;
     borderDistance: number;
-    bounds: number;
+    unpack: boolean;
   }) {
     // Update compute uniforms
-    const computeUniformData = new Float32Array(computeUniformBufferSize / 4);
-    computeUniformData[0] = deltaTime;
-    computeUniformData[1] = separation;
-    computeUniformData[2] = alignment;
-    computeUniformData[3] = cohesion;
-    computeUniformData[4] = borderForce;
-    computeUniformData[5] = borderDistance;
-    computeUniformData[6] = 9.0; // SPEED_LIMIT
-    computeUniformData[7] = 0; // Padding
+    const computeUniformData = new Float32Array([
+      deltaTime,
+      separation,
+      alignment,
+      cohesion,
+      borderForce,
+      borderDistance,
+      9.0, // SPEED_LIMIT
+      0, // Padding
+    ]);
 
     // Write compute uniforms
     device.queue.writeBuffer(computeUniformBuffer, 0, computeUniformData);
@@ -274,41 +272,53 @@ export function useBoidsGPU(
     computePass.setBindGroup(0, direction === "AtoB" ? computeBindGroupA : computeBindGroupB);
 
     // Dispatch compute work
-    computePass.dispatchWorkgroups(Math.ceil(FISHES / 64));
+    computePass.dispatchWorkgroups(Math.ceil(COUNT / 64));
 
     computePass.end();
 
     // Copy results to staging buffer
     const positionResultBuffer = direction === "AtoB" ? positionsBufferB : positionsBufferA;
 
-    computeEncoder.copyBufferToBuffer(positionResultBuffer, 0, positionsStagingBuffer, 0, positionsStagingBuffer.size);
+    if (unpack) {
+      computeEncoder.copyBufferToBuffer(
+        positionResultBuffer,
+        0,
+        positionsStagingBuffer,
+        0,
+        positionsStagingBuffer.size
+      );
+    }
 
     // Submit compute commands and wait for completion
     device.queue.submit([computeEncoder.finish()]);
     await device.queue.onSubmittedWorkDone();
 
-    // Map staging buffer
-    await positionsStagingBuffer.mapAsync(GPUMapMode.READ);
+    const positionsArray = new Float32Array(COUNT * 3);
 
-    // Create a copy of the data before unmapping
-    const alignedPositionsArray = new Float32Array(positionsStagingBuffer.getMappedRange().slice(0));
+    if (unpack) {
+      // Map staging buffer
+      await positionsStagingBuffer.mapAsync(GPUMapMode.READ);
 
-    // Convert back to vec3 format for the return value
-    const positionsArray = new Float32Array(FISHES * 3);
-    for (let i = 0; i < FISHES; i++) {
-      positionsArray[i * 3] = alignedPositionsArray[i * 4]; // x
-      positionsArray[i * 3 + 1] = alignedPositionsArray[i * 4 + 1]; // y
-      positionsArray[i * 3 + 2] = alignedPositionsArray[i * 4 + 2]; // z
+      // Create a copy of the data before unmapping
+      const alignedPositionsArray = new Float32Array(positionsStagingBuffer.getMappedRange().slice(0));
+
+      // Convert back to vec3 format for the return value
+      for (let i = 0; i < COUNT; i++) {
+        positionsArray[i * 3] = alignedPositionsArray[i * 4]; // x
+        positionsArray[i * 3 + 1] = alignedPositionsArray[i * 4 + 1]; // y
+        positionsArray[i * 3 + 2] = alignedPositionsArray[i * 4 + 2]; // z
+      }
+
+      // Now we can safely unmap
+      positionsStagingBuffer.unmap();
     }
-
-    // Now we can safely unmap
-    positionsStagingBuffer.unmap();
 
     // Swap direction for next frame
     direction = direction === "AtoB" ? "BtoA" : "AtoB";
 
     return {
       positions: positionsArray,
+      positionsBuffer: positionResultBuffer,
     };
   }
 
