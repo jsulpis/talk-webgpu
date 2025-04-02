@@ -1,9 +1,10 @@
 import { mat4, vec3 } from "gl-matrix";
 import { useBoidsGPU } from "../boids/webgpu";
 import { useBoidsCPU } from "../boids/cpu";
-import { createSphereGeometry } from "./sphere";
+import { createSphereGeometry } from "./models/sphere";
+import { loadOBJ } from "./models/objLoader";
 
-const COUNT = 10000;
+const COUNT = 100;
 const BOUNDS = 100;
 
 const shaderSource = `
@@ -32,12 +33,13 @@ fn vertexMain(
   @builtin(instance_index) instanceIndex: u32,
 ) -> VertexOutput {
   var output: VertexOutput;
-  let worldPosition = vec4f(positions[instanceIndex], 1.0);
+  let modelPosition = vec4f(positions[instanceIndex], 1.0);
+  let scale = 3.0;
   let modelMatrix = mat4x4f(
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 1.0, 0.0,
-    worldPosition.x, worldPosition.y, worldPosition.z, 1.0
+    scale, 0.0, 0.0, 0.0,
+    0.0, scale, 0.0, 0.0,
+    0.0, 0.0, scale, 0.0,
+    modelPosition.x, modelPosition.y, modelPosition.z, 1.0
   );
   let modelViewMatrix = uniforms.viewMatrix * modelMatrix;
   output.position = uniforms.projectionMatrix * modelViewMatrix * position;
@@ -123,6 +125,7 @@ async function main() {
   });
 
   const renderBindGroupLayout = device.createBindGroupLayout({
+    label: "Render Bind Group Layout",
     entries: [
       {
         binding: 0,
@@ -196,21 +199,22 @@ async function main() {
     label: "Depth Texture",
   });
 
-  const sphereGeometry = createSphereGeometry(1.0);
+  // const geometry = createSphereGeometry(1.0);
+  const geometry = await loadOBJ("fish.obj");
 
   const positionBuffer = device.createBuffer({
-    size: sphereGeometry.positions.byteLength,
+    size: geometry.positions.byteLength,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     label: "Position Vertex Buffer",
   });
-  device.queue.writeBuffer(positionBuffer, 0, sphereGeometry.positions);
+  device.queue.writeBuffer(positionBuffer, 0, geometry.positions);
 
   const normalBuffer = device.createBuffer({
-    size: sphereGeometry.normals.byteLength,
+    size: geometry.normals.byteLength,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     label: "Normal Vertex Buffer",
   });
-  device.queue.writeBuffer(normalBuffer, 0, sphereGeometry.normals);
+  device.queue.writeBuffer(normalBuffer, 0, geometry.normals);
 
   const colors = new Float32Array(COUNT * 4);
   for (let i = 0; i < COUNT; i++) {
@@ -228,11 +232,11 @@ async function main() {
   device.queue.writeBuffer(colorsBuffer, 0, colors);
 
   const indexBuffer = device.createBuffer({
-    size: sphereGeometry.indices.byteLength,
+    size: geometry.indices.byteLength,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
     label: "Index Buffer",
   });
-  device.queue.writeBuffer(indexBuffer, 0, sphereGeometry.indices);
+  device.queue.writeBuffer(indexBuffer, 0, geometry.indices);
 
   // boids parameters
   const separation = 5.0;
@@ -268,9 +272,9 @@ async function main() {
   mat4.translate(viewMatrix, viewMatrix, [0.0, -BOUNDS / 4, -BOUNDS]);
   mat4.rotateX(viewMatrix, viewMatrix, Math.PI / 6);
 
-  const lightDirection = vec3.fromValues(0.5, 0.7, 0);
-  const lightColor = vec3.fromValues(1.5, 1.5, 1.5);
-  const ambientColor = vec3.fromValues(0.2, 0.2, 0.2);
+  const lightDirection = [0.5, 0.7, 0];
+  const lightColor = [0.5, 0.5, 0.5];
+  const ambientColor = [0.2, 0.2, 0.2];
 
   // Update uniforms
   const uniformData = new Float32Array(uniformBufferSize / 4);
@@ -335,7 +339,7 @@ async function main() {
     renderPass.setVertexBuffer(1, normalBuffer);
     renderPass.setIndexBuffer(indexBuffer, "uint16");
 
-    renderPass.drawIndexed(sphereGeometry.indices.length, COUNT, 0, 0, 0);
+    renderPass.drawIndexed(geometry.indices.length, COUNT, 0, 0, 0);
 
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);

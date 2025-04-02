@@ -1,5 +1,3 @@
-import { vec3 } from "gl-matrix";
-
 export function createSphereGeometry(radius = 0.5, stacks = 18, slices = 36) {
   const positions: number[] = [];
   const normals: number[] = [];
@@ -19,12 +17,9 @@ export function createSphereGeometry(radius = 0.5, stacks = 18, slices = 36) {
       const x = radius * sinTheta * cosPhi;
       const y = radius * sinTheta * sinPhi;
       const z = radius * cosTheta;
-
       positions.push(x, y, z);
 
-      // Calculate normals
-      const normal = vec3.fromValues(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
-      normals.push(...normal);
+      normals.push(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
     }
   }
 

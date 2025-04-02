@@ -1,6 +1,6 @@
 import { mat4, vec3 } from "gl-matrix";
 import { useBoidsCPU } from "../boids/cpu";
-import { createSphereGeometry } from "./sphere";
+import { createSphereGeometry } from "./models/sphere";
 
 const COUNT = 400;
 const BOUNDS = 100;
@@ -234,9 +234,9 @@ function main() {
     mat4.translate(viewMatrix, viewMatrix, [0.0, -BOUNDS / 4, -BOUNDS]);
     mat4.rotateX(viewMatrix, viewMatrix, Math.PI / 6);
 
-    const lightDirection = vec3.fromValues(0.5, 0.7, 0);
-    const lightColor = vec3.fromValues(1.5, 1.5, 1.5);
-    const ambientColor = vec3.fromValues(0.2, 0.2, 0.2);
+    const lightDirection = [0.5, 0.7, 0];
+    const lightColor = [1.5, 1.5, 1.5];
+    const ambientColor = [0.2, 0.2, 0.2];
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
