@@ -3,6 +3,8 @@ const computeShaderSource = `
 @group(0) @binding(1) var<storage, read> inputVelocities: array<vec3f>;
 @group(0) @binding(2) var<storage, read_write> outputPositions: array<vec3f>;
 @group(0) @binding(3) var<storage, read_write> outputVelocities: array<vec3f>;
+@group(0) @binding(4) var<storage, read> colors: array<vec3f>;
+@group(0) @binding(5) var<uniform> uniforms: Uniforms;
 
 struct Uniforms {
   deltaTime: f32,
@@ -11,19 +13,7 @@ struct Uniforms {
   cohesionDistance: f32,
   borderForce: f32,
   borderDistance: f32,
-  speedLimit: f32,
-}
-@group(0) @binding(4) var<uniform> uniforms: Uniforms;
-
-const BOUNDS = 100.0;
-
-fn normalize(vec: vec3f) -> vec3f {
-  let length = sqrt(dot(vec, vec));
-  return vec / length;
-}
-
-fn length(vec: vec3f) -> f32 {
-  return sqrt(dot(vec, vec));
+  bounds: f32
 }
 
 @compute @workgroup_size(64)
@@ -33,84 +23,98 @@ fn computeBoids(@builtin(global_invocation_id) id: vec3u) {
     return;
   }
 
-  let selfPosition = inputPositions[index];
-  let selfVelocity = inputVelocities[index];
-  var velocity = selfVelocity;
+  var position = inputPositions[index];
+  var velocity = inputVelocities[index];
+  let color = colors[index];
+  let initialSpeed = length(velocity);
 
-  let zoneRadius = uniforms.separationDistance + uniforms.alignmentDistance + uniforms.cohesionDistance;
-  let separationThresh = uniforms.separationDistance / zoneRadius;
-  let alignmentThresh = (uniforms.separationDistance + uniforms.alignmentDistance) / zoneRadius;
-  let zoneRadiusSquared = zoneRadius * zoneRadius;
+  // Forces for boids rules
+  var alignment = vec3f(0.0);
+  var cohesion = vec3f(0.0);
+  var alignmentCount = 0u;
+  var cohesionCount = 0u;
 
-  // Compute forces from other boids
+  var acceleration = vec3f(0.0);
+  var centerOfMass = vec3f(0.0);
+
+  let separationWeight = 1.5;
+  let alignmentWeight = 1.0;
+  let cohesionWeight = 1.0;
+
+  // Iterate over all other boids
   for (var i = 0u; i < arrayLength(&inputPositions); i++) {
     if (i == index) {
-      continue;
+      continue; // Ignore the boid itself
     }
 
-    let birdPosition = inputPositions[i];
-    let dir = birdPosition - selfPosition;
-    let dist = length(dir);
+    let otherPosition = inputPositions[i];
+    let otherVelocity = inputVelocities[i];
+    let otherColor = colors[i];
 
-    if (dist < 0.0001) {
-      continue;
-    }
+    let sameColor = all(abs(color - otherColor) < vec3f(0.01));
 
-    let distSquared = dist * dist;
-    if (distSquared > zoneRadiusSquared) {
-      continue;
-    }
+    let diff = position - otherPosition;
+    let distance = length(diff);
 
-    let percent = distSquared / zoneRadiusSquared;
-
-    if (percent < separationThresh) {
-      let f = (separationThresh / percent - 1.0) * uniforms.deltaTime;
-      velocity = velocity - normalize(dir) * f;
-    } else if (percent < alignmentThresh) {
-      let threshDelta = alignmentThresh - separationThresh;
-      let adjustedPercent = (percent - separationThresh) / threshDelta;
-      let birdVelocity = inputVelocities[i];
-      let f = (0.5 - cos(adjustedPercent * 2.0 * 3.14159) * 0.5 + 0.5) * uniforms.deltaTime;
-      velocity = velocity + normalize(birdVelocity) * f;
-    } else {
-      let threshDelta = 1.0 - alignmentThresh;
-      var adjustedPercent: f32;
-      if (threshDelta == 0.0) {
-        adjustedPercent = 1.0;
-      } else {
-        adjustedPercent = (percent - alignmentThresh) / threshDelta;
+    if (sameColor) {
+      // Alignment - align with the direction of other boids
+      if (distance < uniforms.alignmentDistance) {
+        alignment += otherVelocity;
+        alignmentCount++;
       }
-      let f = (0.5 - (cos(adjustedPercent * 2.0 * 3.14159) * -0.5 + 0.5)) * uniforms.deltaTime;
-      velocity = velocity + normalize(dir) * f;
+      // Cohesion - move towards the center of nearby boids
+      if (distance < uniforms.cohesionDistance) {
+        centerOfMass += otherPosition;
+        cohesionCount++;
+      }
+    }
+
+    // Separation - avoid collisions with nearby boids
+    if (distance > 0.0 && distance < uniforms.separationDistance) {
+      let repulsionForce = normalize(diff) * (uniforms.separationDistance / distance - 1.0);
+      acceleration += repulsionForce * separationWeight;
     }
   }
 
-  // Border forces
-  let distToBorderX = BOUNDS - abs(selfPosition.x);
-  let distToBorderY = BOUNDS / 2.0 - abs(selfPosition.y);
-  let distToBorderZ = BOUNDS / 2.0 - abs(selfPosition.z);
-  var force = vec3f(0.0);
-
-  if (distToBorderX < uniforms.borderDistance) {
-    force.x = ((uniforms.borderDistance - distToBorderX) / uniforms.borderDistance) * -sign(selfPosition.x);
-  }
-  if (distToBorderY < uniforms.borderDistance) {
-    force.y = ((uniforms.borderDistance - distToBorderY) / uniforms.borderDistance) * -sign(selfPosition.y);
-  }
-  if (distToBorderZ < uniforms.borderDistance) {
-    force.z = ((uniforms.borderDistance - distToBorderZ) / uniforms.borderDistance) * -sign(selfPosition.z);
+  // Alignment force
+  if (alignmentCount > 0u) {
+    let averageVelocity = alignment / f32(alignmentCount);
+    let alignmentForce = averageVelocity - velocity;
+    acceleration += alignmentForce * alignmentWeight;
   }
 
-  velocity = velocity + force * uniforms.borderForce * uniforms.deltaTime;
+  // Cohesion force
+  if (cohesionCount > 0u) {
+    let averagePosition = centerOfMass / f32(cohesionCount);
+    let cohesionForce = averagePosition - position;
+    acceleration += normalize(cohesionForce) * cohesionWeight;
+  }
 
-  // Speed limit
+  // Apply a force near the borders to keep boids within limits
+  if (position.x < -uniforms.bounds + uniforms.borderDistance) {
+    acceleration.x += uniforms.borderForce;
+  } else if (position.x > uniforms.bounds - uniforms.borderDistance) {
+    acceleration.x -= uniforms.borderForce;
+  }
+
+  if (position.y < -uniforms.bounds + uniforms.borderDistance) {
+    acceleration.y += uniforms.borderForce;
+  } else if (position.y > uniforms.bounds - uniforms.borderDistance) {
+    acceleration.y -= uniforms.borderForce;
+  }
+
+  if (position.z < -uniforms.bounds + uniforms.borderDistance) {
+    acceleration.z += uniforms.borderForce;
+  } else if (position.z > uniforms.bounds - uniforms.borderDistance) {
+    acceleration.z -= uniforms.borderForce;
+  }
+
+  velocity += acceleration * uniforms.deltaTime;
+
   let speed = length(velocity);
-  if (speed > uniforms.speedLimit) {
-    velocity = normalize(velocity) * uniforms.speedLimit;
-  }
+  velocity = velocity * (min(4., max(1., speed)) / speed);
 
-  // Update position
-  let position = selfPosition + velocity * uniforms.deltaTime;
+  position += velocity * uniforms.deltaTime;
 
   outputPositions[index] = position;
   outputVelocities[index] = velocity;
@@ -121,9 +125,9 @@ export function useBoidsGPU(
   device: GPUDevice,
   initialPositions: Float32Array,
   initialVelocities: Float32Array,
+  colorsBuffer: GPUBuffer,
   COUNT: number
 ) {
-  // Create compute pipeline
   const computePipeline = device.createComputePipeline({
     layout: "auto",
     compute: {
@@ -135,23 +139,22 @@ export function useBoidsGPU(
     },
   });
 
-  // Create aligned buffers
-  // Pour vec3f, WebGPU nécessite un alignement sur 16 octets (4 float par élément)
-  const positionsSize = COUNT * 4 * Float32Array.BYTES_PER_ELEMENT; // 4 floats per position (xyz + padding)
-  const velocitiesSize = COUNT * 4 * Float32Array.BYTES_PER_ELEMENT; // 4 floats per velocity (xyz + padding)
+  // For vec3f, WebGPU requires alignment on 16 bytes (4 floats per element)
+  const positionsSize = COUNT * 4 * Float32Array.BYTES_PER_ELEMENT;
+  const velocitiesSize = COUNT * 4 * Float32Array.BYTES_PER_ELEMENT;
 
-  // Convertir les tableaux d'entrée au format aligné (x,y,z,0, x,y,z,0, ...)
+  // Convert input arrays to aligned format (x,y,z,0, x,y,z,0, ...)
   const alignedPositions = new Float32Array(COUNT * 4);
   const alignedVelocities = new Float32Array(COUNT * 4);
 
   for (let i = 0; i < COUNT; i++) {
-    // Copier chaque position vec3 avec padding
+    // Copy each position vec3 with padding
     alignedPositions[i * 4] = initialPositions[i * 3]; // x
     alignedPositions[i * 4 + 1] = initialPositions[i * 3 + 1]; // y
     alignedPositions[i * 4 + 2] = initialPositions[i * 3 + 2]; // z
     alignedPositions[i * 4 + 3] = 0; // padding
 
-    // Copier chaque vitesse vec3 avec padding
+    // Copy each velocity vec3 with padding
     alignedVelocities[i * 4] = initialVelocities[i * 3]; // x
     alignedVelocities[i * 4 + 1] = initialVelocities[i * 3 + 1]; // y
     alignedVelocities[i * 4 + 2] = initialVelocities[i * 3 + 2]; // z
@@ -181,29 +184,30 @@ export function useBoidsGPU(
   });
   device.queue.writeBuffer(positionsBufferB, 0, alignedPositions);
 
-  const velocityBufferA = device.createBuffer({
+  const velocitiesBufferA = device.createBuffer({
     size: velocitiesSize,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     label: "Velocity Buffer A",
   });
-  device.queue.writeBuffer(velocityBufferA, 0, alignedVelocities);
+  device.queue.writeBuffer(velocitiesBufferA, 0, alignedVelocities);
 
-  const velocityBufferB = device.createBuffer({
+  const velocitiesBufferB = device.createBuffer({
     size: velocitiesSize,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     label: "Velocity Buffer B",
   });
-  device.queue.writeBuffer(velocityBufferB, 0, alignedVelocities);
+  device.queue.writeBuffer(velocitiesBufferB, 0, alignedVelocities);
 
   // Create compute bind groups
   const computeBindGroupA = device.createBindGroup({
     layout: computePipeline.getBindGroupLayout(0),
     entries: [
       { binding: 0, resource: { buffer: positionsBufferA } },
-      { binding: 1, resource: { buffer: velocityBufferA } },
+      { binding: 1, resource: { buffer: velocitiesBufferA } },
       { binding: 2, resource: { buffer: positionsBufferB } },
-      { binding: 3, resource: { buffer: velocityBufferB } },
-      { binding: 4, resource: { buffer: computeUniformBuffer } },
+      { binding: 3, resource: { buffer: velocitiesBufferB } },
+      { binding: 4, resource: { buffer: colorsBuffer } },
+      { binding: 5, resource: { buffer: computeUniformBuffer } },
     ],
     label: "Compute Bind Group A",
   });
@@ -212,10 +216,11 @@ export function useBoidsGPU(
     layout: computePipeline.getBindGroupLayout(0),
     entries: [
       { binding: 0, resource: { buffer: positionsBufferB } },
-      { binding: 1, resource: { buffer: velocityBufferB } },
+      { binding: 1, resource: { buffer: velocitiesBufferB } },
       { binding: 2, resource: { buffer: positionsBufferA } },
-      { binding: 3, resource: { buffer: velocityBufferA } },
-      { binding: 4, resource: { buffer: computeUniformBuffer } },
+      { binding: 3, resource: { buffer: velocitiesBufferA } },
+      { binding: 4, resource: { buffer: colorsBuffer } },
+      { binding: 5, resource: { buffer: computeUniformBuffer } },
     ],
     label: "Compute Bind Group B",
   });
@@ -231,31 +236,32 @@ export function useBoidsGPU(
 
   async function compute({
     deltaTime,
-    separation,
-    alignment,
-    cohesion,
+    separationDistance,
+    alignmentDistance,
+    cohesionDistance,
     borderForce,
     borderDistance,
+    bounds,
     unpack,
   }: {
     deltaTime: number;
-    separation: number;
-    alignment: number;
-    cohesion: number;
+    separationDistance: number;
+    alignmentDistance: number;
+    cohesionDistance: number;
     borderForce: number;
     borderDistance: number;
+    bounds: number;
     unpack: boolean;
   }) {
     // Update compute uniforms
     const computeUniformData = new Float32Array([
       deltaTime,
-      separation,
-      alignment,
-      cohesion,
+      separationDistance,
+      alignmentDistance,
+      cohesionDistance,
       borderForce,
       borderDistance,
-      9.0, // SPEED_LIMIT
-      0, // Padding
+      bounds,
     ]);
 
     // Write compute uniforms
@@ -278,6 +284,7 @@ export function useBoidsGPU(
 
     // Copy results to staging buffer
     const positionResultBuffer = direction === "AtoB" ? positionsBufferB : positionsBufferA;
+    const velocitiesResultBuffer = direction === "AtoB" ? velocitiesBufferB : velocitiesBufferA;
 
     if (unpack) {
       computeEncoder.copyBufferToBuffer(
@@ -319,6 +326,7 @@ export function useBoidsGPU(
     return {
       positions: positionsArray,
       positionsBuffer: positionResultBuffer,
+      velocitiesBuffer: velocitiesResultBuffer,
     };
   }
 
