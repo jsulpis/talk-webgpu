@@ -82,33 +82,32 @@ fn fragmentMain(@location(0) color: vec4f) -> @location(0) vec4f {
 document.getElementById("objects")!.innerText = COUNT.toString();
 document.getElementById("api")!.innerText = "WebGPU";
 
-let initialPositions = new Float32Array(COUNT * 3);
-for (let i = 0; i < initialPositions.length; i += 3) {
-  initialPositions[i + 0] = (Math.random() - 0.5) * BOUNDS;
-  initialPositions[i + 1] = (Math.random() - 0.5) * BOUNDS;
-  initialPositions[i + 2] = (Math.random() - 0.5) * BOUNDS;
-}
-
-let initialVelocities = new Float32Array(COUNT * 3);
-for (let i = 0; i < initialVelocities.length; i += 3) {
-  initialVelocities[i + 0] = Math.random() * 0.5;
-  initialVelocities[i + 1] = Math.random() * 0.5;
-  initialVelocities[i + 2] = Math.random() * 0.5;
-}
+let initialPositions = new Float32Array(COUNT * 4);
+let initialVelocities = new Float32Array(COUNT * 4);
+let colors = new Float32Array(COUNT * 4);
 
 const red = [1, 0, 0, 1];
 const green = [0, 1, 0, 1];
 const cyan = [0, 0.5, 1, 1];
 
-const colors = new Float32Array(COUNT * 4);
-for (let i = 0; i < COUNT; i++) {
+for (let i = 0; i < initialVelocities.length; i += 4) {
+  initialPositions[i + 0] = (Math.random() - 0.5) * BOUNDS;
+  initialPositions[i + 1] = (Math.random() - 0.5) * BOUNDS;
+  initialPositions[i + 2] = (Math.random() - 0.5) * BOUNDS;
+  initialPositions[i + 3] = 0; // data alignment on 16 bytes
+
+  initialVelocities[i + 0] = Math.random() * 0.5;
+  initialVelocities[i + 1] = Math.random() * 0.5;
+  initialVelocities[i + 2] = Math.random() * 0.5;
+  initialVelocities[i + 3] = 0; // data alignment on 16 bytes
+
   const random = Math.random();
-  if (random < 0.33) {
-    colors.set(red, i * 4);
-  } else if (random < 0.66) {
-    colors.set(green, i * 4);
+  if (random < 1 / 3) {
+    colors.set(red, i);
+  } else if (random < 2 / 3) {
+    colors.set(green, i);
   } else {
-    colors.set(cyan, i * 4);
+    colors.set(cyan, i);
   }
 }
 
@@ -321,7 +320,7 @@ async function main() {
   const computeElement = document.getElementById("compute")!;
   const jsElement = document.getElementById("js")!;
 
-  const computeBoids = useBoidsGPU(device, initialPositions, initialVelocities, colorsBuffer, COUNT).compute;
+  const computeBoids = useBoidsGPU(device, initialPositions, initialVelocities, colorsBuffer, COUNT);
 
   /******************************************************************* */
   /***************************** RENDER ********************************/
@@ -389,7 +388,6 @@ async function main() {
       borderForce,
       borderDistance,
       bounds: BOUNDS,
-      unpack: false,
     }).then(({ positionsBuffer, velocitiesBuffer }) => {
       const compute = performance.measure("compute", "compute");
       computeElement.textContent = compute.duration.toFixed(2) + "ms";

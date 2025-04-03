@@ -139,66 +139,41 @@ export function useBoidsGPU(
     },
   });
 
-  // For vec3f, WebGPU requires alignment on 16 bytes (4 floats per element)
-  const positionsSize = COUNT * 4 * Float32Array.BYTES_PER_ELEMENT;
-  const velocitiesSize = COUNT * 4 * Float32Array.BYTES_PER_ELEMENT;
-
-  // Convert input arrays to aligned format (x,y,z,0, x,y,z,0, ...)
-  const alignedPositions = new Float32Array(COUNT * 4);
-  const alignedVelocities = new Float32Array(COUNT * 4);
-
-  for (let i = 0; i < COUNT; i++) {
-    // Copy each position vec3 with padding
-    alignedPositions[i * 4] = initialPositions[i * 3]; // x
-    alignedPositions[i * 4 + 1] = initialPositions[i * 3 + 1]; // y
-    alignedPositions[i * 4 + 2] = initialPositions[i * 3 + 2]; // z
-    alignedPositions[i * 4 + 3] = 0; // padding
-
-    // Copy each velocity vec3 with padding
-    alignedVelocities[i * 4] = initialVelocities[i * 3]; // x
-    alignedVelocities[i * 4 + 1] = initialVelocities[i * 3 + 1]; // y
-    alignedVelocities[i * 4 + 2] = initialVelocities[i * 3 + 2]; // z
-    alignedVelocities[i * 4 + 3] = 0; // padding
-  }
-
-  // Create buffers for compute shader
-  const computeUniformBufferSize = 32; // Size for uniforms
+  const computeUniformBufferSize = 32;
   const computeUniformBuffer = device.createBuffer({
     size: computeUniformBufferSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     label: "Compute Uniform Buffer",
   });
 
-  // Create GPUBuffers for positions and velocities with proper alignment
   const positionsBufferA = device.createBuffer({
-    size: positionsSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+    size: initialPositions.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     label: "Positions Buffer A",
   });
-  device.queue.writeBuffer(positionsBufferA, 0, alignedPositions);
+  device.queue.writeBuffer(positionsBufferA, 0, initialPositions);
 
   const positionsBufferB = device.createBuffer({
-    size: positionsSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+    size: initialPositions.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     label: "Positions Buffer B",
   });
-  device.queue.writeBuffer(positionsBufferB, 0, alignedPositions);
+  device.queue.writeBuffer(positionsBufferB, 0, initialPositions);
 
   const velocitiesBufferA = device.createBuffer({
-    size: velocitiesSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+    size: initialVelocities.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     label: "Velocity Buffer A",
   });
-  device.queue.writeBuffer(velocitiesBufferA, 0, alignedVelocities);
+  device.queue.writeBuffer(velocitiesBufferA, 0, initialVelocities);
 
   const velocitiesBufferB = device.createBuffer({
-    size: velocitiesSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+    size: initialVelocities.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     label: "Velocity Buffer B",
   });
-  device.queue.writeBuffer(velocitiesBufferB, 0, alignedVelocities);
+  device.queue.writeBuffer(velocitiesBufferB, 0, initialVelocities);
 
-  // Create compute bind groups
   const computeBindGroupA = device.createBindGroup({
     layout: computePipeline.getBindGroupLayout(0),
     entries: [
@@ -225,13 +200,6 @@ export function useBoidsGPU(
     label: "Compute Bind Group B",
   });
 
-  // Create staging buffer for reading results
-  const positionsStagingBuffer = device.createBuffer({
-    size: positionsSize,
-    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    label: "Positions Staging Buffer",
-  });
-
   let direction: "AtoB" | "BtoA" = "AtoB";
 
   async function compute({
@@ -242,7 +210,6 @@ export function useBoidsGPU(
     borderForce,
     borderDistance,
     bounds,
-    unpack,
   }: {
     deltaTime: number;
     separationDistance: number;
@@ -251,9 +218,7 @@ export function useBoidsGPU(
     borderForce: number;
     borderDistance: number;
     bounds: number;
-    unpack: boolean;
   }) {
-    // Update compute uniforms
     const computeUniformData = new Float32Array([
       deltaTime,
       separationDistance,
@@ -264,73 +229,29 @@ export function useBoidsGPU(
       bounds,
     ]);
 
-    // Write compute uniforms
     device.queue.writeBuffer(computeUniformBuffer, 0, computeUniformData);
 
-    // Create compute command encoder
-    const computeEncoder = device.createCommandEncoder({
-      label: "Compute Command Encoder",
-    });
-    const computePass = computeEncoder.beginComputePass();
+    const computeEncoder = device.createCommandEncoder({ label: "Compute Command Encoder" });
 
-    // Set pipeline and bind group
+    const computePass = computeEncoder.beginComputePass();
     computePass.setPipeline(computePipeline);
     computePass.setBindGroup(0, direction === "AtoB" ? computeBindGroupA : computeBindGroupB);
-
-    // Dispatch compute work
     computePass.dispatchWorkgroups(Math.ceil(COUNT / 64));
-
     computePass.end();
 
-    // Copy results to staging buffer
-    const positionResultBuffer = direction === "AtoB" ? positionsBufferB : positionsBufferA;
-    const velocitiesResultBuffer = direction === "AtoB" ? velocitiesBufferB : velocitiesBufferA;
-
-    if (unpack) {
-      computeEncoder.copyBufferToBuffer(
-        positionResultBuffer,
-        0,
-        positionsStagingBuffer,
-        0,
-        positionsStagingBuffer.size
-      );
-    }
-
-    // Submit compute commands and wait for completion
     device.queue.submit([computeEncoder.finish()]);
     await device.queue.onSubmittedWorkDone();
 
-    const positionsArray = new Float32Array(COUNT * 3);
+    const positionResultBuffer = direction === "AtoB" ? positionsBufferB : positionsBufferA;
+    const velocitiesResultBuffer = direction === "AtoB" ? velocitiesBufferB : velocitiesBufferA;
 
-    if (unpack) {
-      // Map staging buffer
-      await positionsStagingBuffer.mapAsync(GPUMapMode.READ);
-
-      // Create a copy of the data before unmapping
-      const alignedPositionsArray = new Float32Array(positionsStagingBuffer.getMappedRange().slice(0));
-
-      // Convert back to vec3 format for the return value
-      for (let i = 0; i < COUNT; i++) {
-        positionsArray[i * 3] = alignedPositionsArray[i * 4]; // x
-        positionsArray[i * 3 + 1] = alignedPositionsArray[i * 4 + 1]; // y
-        positionsArray[i * 3 + 2] = alignedPositionsArray[i * 4 + 2]; // z
-      }
-
-      // Now we can safely unmap
-      positionsStagingBuffer.unmap();
-    }
-
-    // Swap direction for next frame
     direction = direction === "AtoB" ? "BtoA" : "AtoB";
 
     return {
-      positions: positionsArray,
       positionsBuffer: positionResultBuffer,
       velocitiesBuffer: velocitiesResultBuffer,
     };
   }
 
-  return {
-    compute,
-  };
+  return compute;
 }
