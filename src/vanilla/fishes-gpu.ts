@@ -1,12 +1,23 @@
-import { mat4 } from "gl-matrix";
 import { useBoidsGPU } from "../boids/webgpu";
 import { createSphereGeometry } from "./models/sphere";
 import { loadOBJ } from "./models/objLoader";
+import {
+  boidsUniforms,
+  colors,
+  computeElement,
+  computeTime,
+  COUNT,
+  initialPositions,
+  initialVelocities,
+  jsElement,
+  jsTime,
+  renderElement,
+  renderTime,
+  renderUniforms,
+  speed,
+} from "./shared";
 
-const COUNT = 1000;
-const BOUNDS = 100;
-
-const shaderSource = `
+const shaderSource = /* wgsl */ `
 struct Uniforms {
   projectionMatrix: mat4x4f,
   viewMatrix: mat4x4f,
@@ -75,41 +86,8 @@ fn fragmentMain(@location(0) color: vec4f) -> @location(0) vec4f {
 }
 `;
 
-/******************************************************************* */
-/***************************** INIT **********************************/
-/******************************************************************* */
-
 document.getElementById("objects")!.innerText = COUNT.toString();
 document.getElementById("api")!.innerText = "WebGPU";
-
-let initialPositions = new Float32Array(COUNT * 4);
-let initialVelocities = new Float32Array(COUNT * 4);
-let colors = new Float32Array(COUNT * 4);
-
-const red = [1, 0, 0, 1];
-const green = [0, 1, 0, 1];
-const cyan = [0, 0.5, 1, 1];
-
-for (let i = 0; i < initialVelocities.length; i += 4) {
-  initialPositions[i + 0] = (Math.random() - 0.5) * BOUNDS;
-  initialPositions[i + 1] = (Math.random() - 0.5) * BOUNDS;
-  initialPositions[i + 2] = (Math.random() - 0.5) * BOUNDS;
-  initialPositions[i + 3] = 0; // data alignment on 16 bytes
-
-  initialVelocities[i + 0] = Math.random() * 0.5;
-  initialVelocities[i + 1] = Math.random() * 0.5;
-  initialVelocities[i + 2] = Math.random() * 0.5;
-  initialVelocities[i + 3] = 0; // data alignment on 16 bytes
-
-  const random = Math.random();
-  if (random < 1 / 3) {
-    colors.set(red, i);
-  } else if (random < 2 / 3) {
-    colors.set(green, i);
-  } else {
-    colors.set(cyan, i);
-  }
-}
 
 async function main() {
   if (!navigator.gpu) {
@@ -261,15 +239,6 @@ async function main() {
   });
   device.queue.writeBuffer(indexBuffer, 0, geometry.indices);
 
-  // boids parameters
-  const separationDistance = 8.0;
-  const alignmentDistance = 6.0;
-  const cohesionDistance = 8.0;
-  const borderForce = 0.3;
-  const borderDistance = 50.0;
-  const scale = 1;
-
-  const speed = 0.015;
   let lastTime = performance.now();
 
   // Create uniform buffer for view/projection matrices and lighting
@@ -287,44 +256,19 @@ async function main() {
     label: "Uniform Buffer",
   });
 
-  // Update view/projection matrices
-  const fieldOfView = (60 * Math.PI) / 180;
-  const aspect = canvas.width / canvas.height;
-  const zNear = 0.1;
-  const zFar = 1000.0;
-  const projectionMatrix = mat4.create();
-  mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
-
-  const viewMatrix = mat4.create();
-  mat4.translate(viewMatrix, viewMatrix, [0, 0, -BOUNDS * 2]);
-  mat4.rotateX(viewMatrix, viewMatrix, Math.PI / 6);
-
-  const lightDirection = [0.5, 0.7, 0];
-  const lightColor = [1.5, 1.5, 1.5];
-  const ambientColor = [0.2, 0.2, 0.2];
-
-  // Update uniforms
   const uniformData = new Float32Array(uniformBufferSize / 4);
-  uniformData.set(projectionMatrix, 0); // 16 floats
-  uniformData.set(viewMatrix, 16); // 16 floats
-  uniformData.set(lightDirection, 32); // 3 floats, padded to 4
+  uniformData.set(renderUniforms.projectionMatrix, 0); // 16 floats
+  uniformData.set(renderUniforms.viewMatrix, 16); // 16 floats
+  uniformData.set(renderUniforms.lightDirection, 32); // 3 floats, padded to 4
   uniformData[35] = 0;
-  uniformData.set(lightColor, 36); // 3 floats, padded to 4
+  uniformData.set(renderUniforms.lightColor, 36); // 3 floats, padded to 4
   uniformData[39] = 0;
-  uniformData.set(ambientColor, 40); // 3 floats
-  uniformData[43] = scale;
+  uniformData.set(renderUniforms.ambientColor, 40); // 3 floats
+  uniformData[43] = renderUniforms.scale;
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
-  const renderElement = document.getElementById("render")!;
-  const computeElement = document.getElementById("compute")!;
-  const jsElement = document.getElementById("js")!;
-
   const computeBoids = useBoidsGPU(device, initialPositions, initialVelocities, colorsBuffer, COUNT);
-
-  /******************************************************************* */
-  /***************************** RENDER ********************************/
-  /******************************************************************* */
 
   function drawScene(positionsBuffer: GPUBuffer, velocitiesBuffer: GPUBuffer) {
     const commandEncoder = device.createCommandEncoder({
@@ -377,33 +321,28 @@ async function main() {
     performance.mark("js");
 
     const currentTime = performance.now();
-    const deltaTime = (currentTime - lastTime) * speed;
+    boidsUniforms.deltaTime = (currentTime - lastTime) * speed;
     lastTime = currentTime;
 
-    computeBoids({
-      deltaTime,
-      separationDistance,
-      alignmentDistance,
-      cohesionDistance,
-      borderForce,
-      borderDistance,
-      bounds: BOUNDS,
-    }).then(({ positionsBuffer, velocitiesBuffer }) => {
+    computeBoids(boidsUniforms).then(({ positionsBuffer, velocitiesBuffer }) => {
       const compute = performance.measure("compute", "compute");
-      computeElement.textContent = compute.duration.toFixed(2) + "ms";
+      computeTime.addValue(compute.duration);
+      computeElement.textContent = computeTime.getAverage().toFixed(1) + "ms";
 
       performance.mark("render");
 
       drawScene(positionsBuffer, velocitiesBuffer);
 
       const measure = performance.measure("render", "render");
-      renderElement.textContent = measure.duration.toFixed(2) + "ms";
+      renderTime.addValue(measure.duration);
+      renderElement.textContent = renderTime.getAverage().toFixed(1) + "ms";
 
       requestAnimationFrame(render);
     });
 
     const measure = performance.measure("js", "js");
-    jsElement.textContent = measure.duration.toFixed(2) + "ms";
+    jsTime.addValue(measure.duration);
+    jsElement.textContent = jsTime.getAverage().toFixed(1) + "ms";
   }
 
   render();

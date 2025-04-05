@@ -30,6 +30,8 @@ export const computeTime = new MovingAverage(100);
 export const renderTime = new MovingAverage(100);
 export const jsTime = new MovingAverage(100);
 
+export const speed = 0.015;
+
 export let initialPositions = new Float32Array(COUNT * 4);
 export let initialVelocities = new Float32Array(COUNT * 4);
 export let colors = new Float32Array(COUNT * 4);

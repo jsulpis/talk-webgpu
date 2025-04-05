@@ -13,6 +13,7 @@ import {
   renderElement,
   renderTime,
   renderUniforms,
+  speed,
 } from "./shared";
 
 document.getElementById("objects")!.innerText = COUNT.toString();
@@ -184,8 +185,6 @@ async function main() {
   const normalBuffer = createStaticBuffer(gl, geometry.normals);
   const coordsBuffer = createStaticBuffer(gl, coords);
   const indexBuffer = createStaticBuffer(gl, geometry.indices, gl.ELEMENT_ARRAY_BUFFER);
-
-  const speed = 0.015;
 
   let lastTime = performance.now();
 
