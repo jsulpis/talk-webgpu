@@ -9,6 +9,25 @@ const BOUNDS = 100;
 document.getElementById("objects")!.innerText = COUNT.toString();
 document.getElementById("api")!.innerText = "WebGL";
 
+class MovingAverage {
+  constructor(private windowSize: number, private values: number[] = []) {}
+
+  addValue(value: number): void {
+    this.values.push(value);
+    if (this.values.length > this.windowSize) {
+      this.values.shift();
+    }
+  }
+
+  getAverage(): number {
+    if (this.values.length === 0) {
+      return 0;
+    }
+    const sum = this.values.reduce((acc, val) => acc + val, 0);
+    return sum / this.values.length;
+  }
+}
+
 // Vertex shader program
 const vsSource = `#version 300 es
     precision highp float;
@@ -209,6 +228,7 @@ async function main() {
 
   const renderElement = document.getElementById("render")!;
   const computeElement = document.getElementById("compute")!;
+  const jsElement = document.getElementById("js")!;
 
   // Add boids parameters
   const separationDistance = 8.0;
@@ -226,12 +246,41 @@ async function main() {
     colorTexture,
   } = useBoidsWebGL(gl, initialPositions, initialVelocities, colors, COUNT);
 
+  const ext = gl.getExtension("EXT_disjoint_timer_query_webgl2");
+  const query = gl.createQuery();
+  gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
+  gl.endQuery(ext.TIME_ELAPSED_EXT);
+
+  const computeTime = new MovingAverage(100);
+  const renderTime = new MovingAverage(100);
+  const jsTime = new MovingAverage(100);
+
+  let measureTarget: "compute" | "render" = "compute";
+
   function render() {
-    performance.mark("compute");
+    const timeAvailable = gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE);
+    if (!timeAvailable) {
+      // still computing the previous frame, skip this frame
+      requestAnimationFrame(render);
+      return;
+    }
 
     const currentTime = performance.now();
     const deltaTime = (currentTime - lastTime) * speed;
     lastTime = currentTime;
+
+    const measuredTime = gl.getQueryParameter(query, gl.QUERY_RESULT);
+
+    if (measureTarget === "render") {
+      renderTime.addValue(measuredTime / 1e6);
+      renderElement.textContent = renderTime.getAverage().toFixed(1) + "ms";
+      measureTarget = "compute";
+      gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
+    } else {
+      computeTime.addValue(measuredTime / 1e6);
+      computeElement.textContent = computeTime.getAverage().toFixed(1) + "ms";
+      measureTarget = "render";
+    }
 
     const { positionsTexture, velocitiesTexture } = computeBoids({
       deltaTime,
@@ -243,10 +292,11 @@ async function main() {
       bounds: BOUNDS,
     });
 
-    const compute = performance.measure("compute", "compute");
-    computeElement.textContent = compute.duration.toFixed(2) + "ms";
-
-    performance.mark("render");
+    if (measureTarget === "compute") {
+      gl.endQuery(ext.TIME_ELAPSED_EXT);
+    } else {
+      gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
+    }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -305,12 +355,16 @@ async function main() {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
     gl.drawElementsInstanced(gl.TRIANGLES, vertexCount, type, offset, COUNT);
 
-    const measure = performance.measure("render", "render");
-    renderElement.textContent = measure.duration.toFixed(2) + "ms";
+    if (measureTarget === "render") {
+      gl.endQuery(ext.TIME_ELAPSED_EXT);
+    }
+
+    jsTime.addValue(performance.now() - lastTime);
+    jsElement.textContent = jsTime.getAverage().toFixed(1) + "ms";
 
     requestAnimationFrame(render);
   }
-  requestAnimationFrame(render);
+  render();
 }
 
 window.onload = main;
