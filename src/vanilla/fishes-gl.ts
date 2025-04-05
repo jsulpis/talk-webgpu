@@ -1,8 +1,9 @@
-import { mat4, vec3 } from "gl-matrix";
-import { useBoidsCPU } from "../boids/cpu";
+import { mat4 } from "gl-matrix";
 import { createSphereGeometry } from "./models/sphere";
+import { loadOBJ } from "./models/objLoader";
+import { useBoidsWebGL } from "../boids/webgl";
 
-const COUNT = 400;
+const COUNT = 10000;
 const BOUNDS = 100;
 
 document.getElementById("objects")!.innerText = COUNT.toString();
@@ -17,35 +18,68 @@ const vsSource = `#version 300 es
     uniform mat4 uViewMatrix;
     uniform mat4 uModelMatrix;
     uniform vec3 uLightDirection;
+    uniform vec3 uLightColor;
+    uniform vec3 uAmbientColor;
     uniform vec4 uInstanceColor;
+    uniform sampler2D tPositions;
+    uniform sampler2D tVelocities;
+    uniform sampler2D tColors;
     out vec4 vColor;
     out vec3 vNormal;
     out vec3 vLightDirection;
 
     void main(void) {
-        gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;
-        vNormal = mat3(uViewMatrix * uModelMatrix) * aVertexNormal;
-        vLightDirection = (uViewMatrix * vec4(uLightDirection, 0.0)).xyz;
-        vColor = uInstanceColor;
+      vec2 textureSize = vec2(textureSize(tColors, 0));
+      int x = gl_InstanceID % int(textureSize.x);
+      int y = gl_InstanceID / int(textureSize.x);
+      vec2 aCoords = vec2(x, y) / textureSize;
+
+      vec3 modelPosition = texture(tPositions, aCoords).xyz;
+      float scale = .5;
+
+      // Construct a rotation matrix that aligns the object's forward axis with the velocity direction
+      vec3 velocity = texture(tVelocities, aCoords).xyz;
+      vec3 forward = normalize(velocity);
+      vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), forward));
+      vec3 up = cross(forward, right);
+
+      mat4 rotationMatrix = mat4(
+        right.x, right.y, right.z, 0.0,
+        up.x, up.y, up.z, 0.0,
+        forward.x, forward.y, forward.z, 0.0,
+        0.0, 0.0, 0.0, 1.0
+      );
+
+      mat4 modelMatrix = mat4(
+        scale * rotationMatrix[0][0], scale * rotationMatrix[0][1], scale * rotationMatrix[0][2], 0.0,
+        scale * rotationMatrix[1][0], scale * rotationMatrix[1][1], scale * rotationMatrix[1][2], 0.0,
+        scale * rotationMatrix[2][0], scale * rotationMatrix[2][1], scale * rotationMatrix[2][2], 0.0,
+        modelPosition.x, modelPosition.y, modelPosition.z, 1.0
+      );
+      mat4 modelViewMatrix = uViewMatrix * modelMatrix;
+
+      gl_Position = uProjectionMatrix * modelViewMatrix * aVertexPosition;
+      vNormal = mat3(modelViewMatrix) * aVertexNormal;
+      vLightDirection = (uViewMatrix * vec4(uLightDirection, 0.0)).xyz;
+
+      vec4 color = texture(tColors, aCoords).rgba;
+      vec3 vertexNormal = (modelViewMatrix * vec4(aVertexNormal, 0.0)).xyz;
+      vec3 lightDirection = (uViewMatrix * vec4(uLightDirection, 0.0)).xyz;
+      vec3 diffuse = uLightColor * max(dot(vertexNormal, lightDirection), 0.0);
+      vec3 ambient = uAmbientColor;
+
+      vColor = vec4((diffuse + ambient) * color.rgb, color.a);
     }
 `;
 
 // Fragment shader program
 const fsSource = `#version 300 es
     precision highp float;
-
     in vec4 vColor;
-    in vec3 vNormal;
-    in vec3 vLightDirection;
-    uniform vec3 uLightColor;
-    uniform vec3 uAmbientColor;
     out vec4 fragColor;
 
     void main(void) {
-        highp vec3 light = uLightColor * vColor.rgb * max(dot(vNormal, vLightDirection), 0.0);
-        highp vec3 ambient = uAmbientColor;
-        highp vec3 color = (light + ambient) * vColor.rgb;
-        fragColor = vec4(color, vColor.a);
+      fragColor = vColor;
     }
 `;
 
@@ -53,18 +87,33 @@ const fsSource = `#version 300 es
 /***************************** GPGPU *********************************/
 /******************************************************************* */
 
-let initialPositions = new Float32Array(COUNT * 3);
-for (let i = 0; i < initialPositions.length; i += 3) {
-  initialPositions[i + 0] = ((Math.random() - 0.5) * BOUNDS) / 4;
-  initialPositions[i + 1] = ((Math.random() - 0.5) * BOUNDS) / 4;
-  initialPositions[i + 2] = ((Math.random() - 0.5) * BOUNDS) / 4;
-}
+let initialPositions = new Float32Array(COUNT * 4);
+let initialVelocities = new Float32Array(COUNT * 4);
+let colors = new Float32Array(COUNT * 4);
 
-let initialVelocities = new Float32Array(COUNT * 3);
-for (let i = 0; i < initialVelocities.length; i += 3) {
-  initialVelocities[i + 0] = 0.5;
-  initialVelocities[i + 1] = 0.5;
-  initialVelocities[i + 2] = 0.5;
+const red = [1, 0, 0, 1];
+const green = [0, 1, 0, 1];
+const cyan = [0, 0.5, 1, 1];
+
+for (let i = 0; i < initialVelocities.length; i += 4) {
+  initialPositions[i + 0] = (Math.random() - 0.5) * BOUNDS;
+  initialPositions[i + 1] = (Math.random() - 0.5) * BOUNDS;
+  initialPositions[i + 2] = (Math.random() - 0.5) * BOUNDS;
+  initialPositions[i + 3] = 0; // data alignment on 16 bytes
+
+  initialVelocities[i + 0] = Math.random() * 0.5;
+  initialVelocities[i + 1] = Math.random() * 0.5;
+  initialVelocities[i + 2] = Math.random() * 0.5;
+  initialVelocities[i + 3] = 0; // data alignment on 16 bytes
+
+  const random = Math.random();
+  if (random < 1 / 3) {
+    colors.set(red, i);
+  } else if (random < 2 / 3) {
+    colors.set(green, i);
+  } else {
+    colors.set(cyan, i);
+  }
 }
 
 function initShaderProgram(gl: WebGLRenderingContext, vsSource: string, fsSource: string): WebGLProgram | null {
@@ -106,24 +155,7 @@ function loadShader(gl: WebGLRenderingContext, type: number, source: string): We
   return shader;
 }
 
-interface ProgramInfo {
-  program: WebGLProgram;
-  attribLocations: {
-    vertexPosition: number;
-    vertexNormal: number;
-  };
-  uniformLocations: {
-    projectionMatrix: WebGLUniformLocation | null;
-    viewMatrix: WebGLUniformLocation | null;
-    modelMatrix: WebGLUniformLocation | null;
-    lightDirection: WebGLUniformLocation | null;
-    lightColor: WebGLUniformLocation | null;
-    ambientColor: WebGLUniformLocation | null;
-    instanceColor: WebGLUniformLocation | null;
-  };
-}
-
-function main() {
+async function main() {
   const canvas = document.createElement("canvas");
   canvas.width = window.innerWidth * devicePixelRatio;
   canvas.height = window.innerHeight * devicePixelRatio;
@@ -140,7 +172,7 @@ function main() {
     return;
   }
 
-  const programInfo: ProgramInfo = {
+  const programInfo = {
     program: shaderProgram,
     attribLocations: {
       vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
@@ -154,43 +186,45 @@ function main() {
       lightColor: gl.getUniformLocation(shaderProgram, "uLightColor"),
       ambientColor: gl.getUniformLocation(shaderProgram, "uAmbientColor"),
       instanceColor: gl.getUniformLocation(shaderProgram, "uInstanceColor"),
+      positions: gl.getUniformLocation(shaderProgram, "tPositions"),
+      velocities: gl.getUniformLocation(shaderProgram, "tVelocities"),
+      colors: gl.getUniformLocation(shaderProgram, "tColors"),
     },
   };
 
-  const sphereGeometry = createSphereGeometry();
+  // const geometry = createSphereGeometry();
+  const geometry = await loadOBJ("fish.obj");
 
   const positionBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sphereGeometry.positions), gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(geometry.positions), gl.STATIC_DRAW);
 
   const normalBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sphereGeometry.normals), gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(geometry.normals), gl.STATIC_DRAW);
 
   const indexBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(sphereGeometry.indices), gl.STATIC_DRAW);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(geometry.indices), gl.STATIC_DRAW);
 
   const renderElement = document.getElementById("render")!;
   const computeElement = document.getElementById("compute")!;
 
-  const instanceColors = new Float32Array(COUNT * 4);
-  for (let i = 0; i < COUNT; i++) {
-    instanceColors[i * 4] = Math.random();
-    instanceColors[i * 4 + 1] = Math.random();
-    instanceColors[i * 4 + 2] = Math.random();
-    instanceColors[i * 4 + 3] = 1;
-  }
-
   // Add boids parameters
-  const separation = 5.0;
-  const alignment = 4.0;
-  const cohesion = 10.0;
-  const borderForce = 10;
-  const speed = 1 / 200;
+  const separationDistance = 8.0;
+  const alignmentDistance = 6.0;
+  const cohesionDistance = 8.0;
+  const borderForce = 0.3;
+  const borderDistance = 50.0;
+  const speed = 0.015;
+
   let lastTime = performance.now();
 
-  const computeBoids = useBoidsCPU(initialPositions, initialVelocities, COUNT).compute;
+  const {
+    compute: computeBoids,
+    coords,
+    colorTexture,
+  } = useBoidsWebGL(gl, initialPositions, initialVelocities, colors, COUNT);
 
   function render() {
     performance.mark("compute");
@@ -199,15 +233,14 @@ function main() {
     const deltaTime = (currentTime - lastTime) * speed;
     lastTime = currentTime;
 
-    const { positions } = computeBoids({
+    const { positionsTexture, velocitiesTexture } = computeBoids({
       deltaTime,
-      separation,
-      alignment,
-      cohesion,
-      currentTime,
-      bounds: BOUNDS,
+      separationDistance,
+      alignmentDistance,
+      cohesionDistance,
       borderForce,
-      borderDistance: BOUNDS / 2,
+      borderDistance,
+      bounds: BOUNDS,
     });
 
     const compute = performance.measure("compute", "compute");
@@ -215,6 +248,8 @@ function main() {
 
     performance.mark("render");
 
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clearDepth(1.0);
     gl.enable(gl.DEPTH_TEST);
@@ -231,7 +266,7 @@ function main() {
     mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
 
     const viewMatrix = mat4.create();
-    mat4.translate(viewMatrix, viewMatrix, [0.0, -BOUNDS / 4, -BOUNDS]);
+    mat4.translate(viewMatrix, viewMatrix, [0, 0, -BOUNDS * 2]);
     mat4.rotateX(viewMatrix, viewMatrix, Math.PI / 6);
 
     const lightDirection = [0.5, 0.7, 0];
@@ -248,29 +283,27 @@ function main() {
 
     gl.useProgram(programInfo.program);
 
+    gl.activeTexture(gl.TEXTURE6);
+    gl.bindTexture(gl.TEXTURE_2D, positionsTexture);
+    gl.uniform1i(programInfo.uniformLocations.positions, 6);
+    gl.activeTexture(gl.TEXTURE7);
+    gl.bindTexture(gl.TEXTURE_2D, velocitiesTexture);
+    gl.uniform1i(programInfo.uniformLocations.velocities, 7);
+    gl.activeTexture(gl.TEXTURE8);
+    gl.bindTexture(gl.TEXTURE_2D, colorTexture);
+    gl.uniform1i(programInfo.uniformLocations.colors, 8);
+
     gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
     gl.uniformMatrix4fv(programInfo.uniformLocations.viewMatrix, false, viewMatrix);
     gl.uniform3fv(programInfo.uniformLocations.lightDirection, lightDirection);
     gl.uniform3fv(programInfo.uniformLocations.lightColor, lightColor);
     gl.uniform3fv(programInfo.uniformLocations.ambientColor, ambientColor);
 
-    // Draw each instance
-    for (let i = 0; i < COUNT; i++) {
-      const modelMatrix = mat4.create();
-      const position = vec3.fromValues(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-      mat4.translate(modelMatrix, modelMatrix, position);
-      gl.uniformMatrix4fv(programInfo.uniformLocations.modelMatrix, false, modelMatrix);
-
-      // Set color for this instance
-      const color = instanceColors.slice(i * 4, (i + 1) * 4);
-      gl.uniform4fv(programInfo.uniformLocations.instanceColor, color);
-
-      const vertexCount = sphereGeometry.indices.length;
-      const type = gl.UNSIGNED_SHORT;
-      const offset = 0;
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-      gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
-    }
+    const vertexCount = geometry.indices.length;
+    const type = gl.UNSIGNED_SHORT;
+    const offset = 0;
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.drawElementsInstanced(gl.TRIANGLES, vertexCount, type, offset, COUNT);
 
     const measure = performance.measure("render", "render");
     renderElement.textContent = measure.duration.toFixed(2) + "ms";

@@ -27,7 +27,7 @@ export function computePositions(
   velocities: Float32Array,
   deltaTime: number
 ) {
-  for (let i = 0; i < input.length; i += 3) {
+  for (let i = 0; i < input.length; i += 4) {
     output[i + 0] = input[i + 0] + velocities[i + 0] * deltaTime;
     output[i + 1] = input[i + 1] + velocities[i + 1] * deltaTime;
     output[i + 2] = input[i + 2] + velocities[i + 2] * deltaTime;
@@ -47,7 +47,7 @@ export function computeVelocities(
   borderDistance: number,
   bounds: number
 ) {
-  const width = Math.sqrt(positions.length / 3);
+  const width = Math.sqrt(positions.length / 4);
   const height = width;
 
   const zoneRadius = separationDistance + alignmentDistance + cohesionDistance;
@@ -55,7 +55,7 @@ export function computeVelocities(
   const alignmentThresh = (separationDistance + alignmentDistance) / zoneRadius;
   const zoneRadiusSquared = zoneRadius * zoneRadius;
 
-  for (let i = 0; i < input.length; i += 3) {
+  for (let i = 0; i < input.length; i += 4) {
     const selfPosition: [number, number, number] = [positions[i], positions[i + 1], positions[i + 2]];
     const selfVelocity: [number, number, number] = [input[i], input[i + 1], input[i + 2]];
     let velocity: [number, number, number] = selfVelocity;
@@ -69,9 +69,9 @@ export function computeVelocities(
       for (let x = 0; x < width; x++) {
         const ref = [(x + 0.5) / width, (y + 0.5) / height];
         const birdPosition: [number, number, number] = [
-          positions[(y * width + x) * 3],
-          positions[(y * width + x) * 3 + 1],
-          positions[(y * width + x) * 3 + 2],
+          positions[(y * width + x) * 4],
+          positions[(y * width + x) * 4 + 1],
+          positions[(y * width + x) * 4 + 2],
         ];
 
         dir = subtract(birdPosition, selfPosition);
@@ -93,9 +93,9 @@ export function computeVelocities(
           const adjustedPercent = (percent - separationThresh) / threshDelta;
 
           const birdVelocity: [number, number, number] = [
-            input[(y * width + x) * 3],
-            input[(y * width + x) * 3 + 1],
-            input[(y * width + x) * 3 + 2],
+            input[(y * width + x) * 4],
+            input[(y * width + x) * 4 + 1],
+            input[(y * width + x) * 4 + 2],
           ];
 
           const f = (0.5 - Math.cos(adjustedPercent * 2 * Math.PI) * 0.5 + 0.5) * deltaTime;
@@ -157,8 +157,8 @@ export function useBoidsCPU(initialPositions: Float32Array, initialVelocities: F
   let positionsDataA = new Float32Array(initialPositions);
   let velocityDataA = new Float32Array(initialVelocities);
 
-  let positionsDataB = new Float32Array(FISHES * 3);
-  let velocityDataB = new Float32Array(FISHES * 3);
+  let positionsDataB = new Float32Array(FISHES * 4);
+  let velocityDataB = new Float32Array(FISHES * 4);
 
   const positionsData = {
     read: positionsDataA,
