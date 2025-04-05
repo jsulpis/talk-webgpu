@@ -150,51 +150,18 @@ void main() {
 `;
 
 class PingPongBuffer {
-  private gl: WebGL2RenderingContext;
-  private width: number;
-  private height: number;
-  private internalFormat: number;
-  private format: number;
-  private type: number;
-  private numComponents: number;
   private framebuffers: WebGLFramebuffer[];
   private textures: WebGLTexture[];
   private index: number;
 
-  constructor(
-    gl: WebGL2RenderingContext,
-    width: number,
-    height: number,
-    internalFormat: number,
-    format: number,
-    type: number,
-    numComponents: number,
-    data?: Float32Array
-  ) {
-    this.gl = gl;
-    this.width = width;
-    this.height = height;
-    this.internalFormat = internalFormat;
-    this.format = format;
-    this.type = type;
-    this.numComponents = numComponents;
-
+  constructor(private gl: WebGL2RenderingContext, width: number, height: number, data?: Float32Array) {
     this.framebuffers = [this.createFramebuffer(), this.createFramebuffer()];
-    this.textures = [this.createTexture(), this.createTexture()];
+    this.textures = [createDataTexture(gl, width, height, data), createDataTexture(gl, width, height, data)];
 
     // Bind textures to framebuffers
     for (let i = 0; i < 2; i++) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffers[i]);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.textures[i], 0);
-    }
-
-    // Initialize with data if provided
-    if (data) {
-      gl.bindTexture(gl.TEXTURE_2D, this.textures[0]);
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, this.format, this.type, data);
-
-      gl.bindTexture(gl.TEXTURE_2D, this.textures[1]);
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, this.format, this.type, data);
     }
 
     gl.bindTexture(gl.TEXTURE_2D, null);
@@ -203,50 +170,27 @@ class PingPongBuffer {
     this.index = 0;
   }
 
-  private createTexture(): WebGLTexture {
-    const { gl, width, height, internalFormat, format, type } = this;
-    const texture = gl.createTexture();
-    if (!texture) throw new Error("Failed to create texture");
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, null);
-    return texture;
-  }
-
-  private createFramebuffer(): WebGLFramebuffer {
+  private createFramebuffer() {
     const framebuffer = this.gl.createFramebuffer();
     if (!framebuffer) throw new Error("Failed to create framebuffer");
     return framebuffer;
   }
 
-  public swap(): void {
+  public swap() {
     this.index = (this.index + 1) % 2;
   }
 
-  public get read(): { texture: WebGLTexture } {
+  public get read() {
     return {
       texture: this.textures[this.index],
     };
   }
 
-  public get write(): { texture: WebGLTexture; framebuffer: WebGLFramebuffer } {
+  public get write() {
     return {
       texture: this.textures[(this.index + 1) % 2],
       framebuffer: this.framebuffers[(this.index + 1) % 2],
     };
-  }
-
-  // Helper to read data back to CPU
-  public readPixels(): Float32Array {
-    const { gl, width, height, format, type, numComponents } = this;
-    const pixels = new Float32Array(width * height * numComponents);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffers[this.index]);
-    gl.readPixels(0, 0, width, height, format, type, pixels);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    return pixels;
   }
 }
 
@@ -275,38 +219,10 @@ export function useBoidsWebGL(
     throw new Error("Floating point textures are not supported by your browser.");
   }
 
-  // Create position and velocity buffers with ping-pong technique
-  const positionBuffer = new PingPongBuffer(
-    gl,
-    textureSide,
-    textureSide,
-    gl.RGBA32F,
-    gl.RGBA,
-    gl.FLOAT,
-    4,
-    paddedPositions
-  );
+  const positionBuffer = new PingPongBuffer(gl, textureSide, textureSide, paddedPositions);
+  const velocityBuffer = new PingPongBuffer(gl, textureSide, textureSide, paddedVelocities);
 
-  const velocityBuffer = new PingPongBuffer(
-    gl,
-    textureSide,
-    textureSide,
-    gl.RGBA32F,
-    gl.RGBA,
-    gl.FLOAT,
-    4,
-    paddedVelocities
-  );
-
-  // Create static color texture
-  const colorTexture = gl.createTexture();
-  if (!colorTexture) throw new Error("Failed to create color texture");
-  gl.bindTexture(gl.TEXTURE_2D, colorTexture);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, textureSide, textureSide, 0, gl.RGBA, gl.FLOAT, paddedColors);
+  const colorTexture = createDataTexture(gl, textureSide, textureSide, paddedColors);
 
   // Create quad for fullscreen rendering
   const quadBuffer = gl.createBuffer();
@@ -376,8 +292,8 @@ export function useBoidsWebGL(
   const elementsCount = initialPositions.length / 4;
   const coords = new Float32Array(elementsCount * 2);
   for (let i = 0; i < elementsCount; i++) {
-    const u = (i % textureSize) / textureSize;
-    const v = Math.floor(i / textureSize) / textureSize;
+    const u = (i % textureSide) / textureSide;
+    const v = Math.floor(i / textureSide) / textureSide;
     coords.set([u, v], i * 2);
   }
 
@@ -455,32 +371,9 @@ export function useBoidsWebGL(
 
     positionBuffer.swap();
 
-    // Return read buffers for rendering
     return {
       positionsTexture: positionBuffer.read.texture,
       velocitiesTexture: velocityBuffer.read.texture,
-      // Optional: read back data to CPU if needed
-      getPositions: () => {
-        const data = positionBuffer.readPixels();
-        // Convert from RGBA to RGB format for compatibility with original code
-        const positions = new Float32Array(COUNT * 3);
-        for (let i = 0; i < COUNT; i++) {
-          positions[i * 3] = data[i * 4];
-          positions[i * 3 + 1] = data[i * 4 + 1];
-          positions[i * 3 + 2] = data[i * 4 + 2];
-        }
-        return positions;
-      },
-      getVelocities: () => {
-        const data = velocityBuffer.readPixels();
-        const velocities = new Float32Array(COUNT * 3);
-        for (let i = 0; i < COUNT; i++) {
-          velocities[i * 3] = data[i * 4];
-          velocities[i * 3 + 1] = data[i * 4 + 1];
-          velocities[i * 3 + 2] = data[i * 4 + 2];
-        }
-        return velocities;
-      },
     };
   }
 
@@ -489,4 +382,16 @@ export function useBoidsWebGL(
     coords,
     colorTexture,
   };
+}
+
+function createDataTexture(gl: WebGL2RenderingContext, width: number, height: number, data?: Float32Array) {
+  const colorTexture = gl.createTexture();
+  if (!colorTexture) throw new Error("Failed to create color texture");
+  gl.bindTexture(gl.TEXTURE_2D, colorTexture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, data || null);
+  return colorTexture;
 }

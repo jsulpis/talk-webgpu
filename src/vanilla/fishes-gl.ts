@@ -1,45 +1,36 @@
-import { mat4 } from "gl-matrix";
-import { createSphereGeometry } from "./models/sphere";
 import { loadOBJ } from "./models/objLoader";
 import { useBoidsWebGL } from "../boids/webgl";
-
-const COUNT = 10000;
-const BOUNDS = 100;
+import {
+  boidsUniforms,
+  colors,
+  computeElement,
+  computeTime,
+  COUNT,
+  initialPositions,
+  initialVelocities,
+  jsElement,
+  jsTime,
+  renderElement,
+  renderTime,
+  renderUniforms,
+} from "./shared";
 
 document.getElementById("objects")!.innerText = COUNT.toString();
 document.getElementById("api")!.innerText = "WebGL";
-
-class MovingAverage {
-  constructor(private windowSize: number, private values: number[] = []) {}
-
-  addValue(value: number): void {
-    this.values.push(value);
-    if (this.values.length > this.windowSize) {
-      this.values.shift();
-    }
-  }
-
-  getAverage(): number {
-    if (this.values.length === 0) {
-      return 0;
-    }
-    const sum = this.values.reduce((acc, val) => acc + val, 0);
-    return sum / this.values.length;
-  }
-}
 
 // Vertex shader program
 const vsSource = `#version 300 es
     precision highp float;
     in vec4 aVertexPosition;
     in vec3 aVertexNormal;
+    in vec2 aCoords;
     uniform mat4 uProjectionMatrix;
     uniform mat4 uViewMatrix;
     uniform mat4 uModelMatrix;
     uniform vec3 uLightDirection;
     uniform vec3 uLightColor;
     uniform vec3 uAmbientColor;
-    uniform vec4 uInstanceColor;
+    uniform float uScale;
     uniform sampler2D tPositions;
     uniform sampler2D tVelocities;
     uniform sampler2D tColors;
@@ -48,13 +39,7 @@ const vsSource = `#version 300 es
     out vec3 vLightDirection;
 
     void main(void) {
-      vec2 textureSize = vec2(textureSize(tColors, 0));
-      int x = gl_InstanceID % int(textureSize.x);
-      int y = gl_InstanceID / int(textureSize.x);
-      vec2 aCoords = vec2(x, y) / textureSize;
-
       vec3 modelPosition = texture(tPositions, aCoords).xyz;
-      float scale = .5;
 
       // Construct a rotation matrix that aligns the object's forward axis with the velocity direction
       vec3 velocity = texture(tVelocities, aCoords).xyz;
@@ -70,9 +55,9 @@ const vsSource = `#version 300 es
       );
 
       mat4 modelMatrix = mat4(
-        scale * rotationMatrix[0][0], scale * rotationMatrix[0][1], scale * rotationMatrix[0][2], 0.0,
-        scale * rotationMatrix[1][0], scale * rotationMatrix[1][1], scale * rotationMatrix[1][2], 0.0,
-        scale * rotationMatrix[2][0], scale * rotationMatrix[2][1], scale * rotationMatrix[2][2], 0.0,
+        uScale * rotationMatrix[0][0], uScale * rotationMatrix[0][1], uScale * rotationMatrix[0][2], 0.0,
+        uScale * rotationMatrix[1][0], uScale * rotationMatrix[1][1], uScale * rotationMatrix[1][2], 0.0,
+        uScale * rotationMatrix[2][0], uScale * rotationMatrix[2][1], uScale * rotationMatrix[2][2], 0.0,
         modelPosition.x, modelPosition.y, modelPosition.z, 1.0
       );
       mat4 modelViewMatrix = uViewMatrix * modelMatrix;
@@ -102,42 +87,9 @@ const fsSource = `#version 300 es
     }
 `;
 
-/******************************************************************* */
-/***************************** GPGPU *********************************/
-/******************************************************************* */
-
-let initialPositions = new Float32Array(COUNT * 4);
-let initialVelocities = new Float32Array(COUNT * 4);
-let colors = new Float32Array(COUNT * 4);
-
-const red = [1, 0, 0, 1];
-const green = [0, 1, 0, 1];
-const cyan = [0, 0.5, 1, 1];
-
-for (let i = 0; i < initialVelocities.length; i += 4) {
-  initialPositions[i + 0] = (Math.random() - 0.5) * BOUNDS;
-  initialPositions[i + 1] = (Math.random() - 0.5) * BOUNDS;
-  initialPositions[i + 2] = (Math.random() - 0.5) * BOUNDS;
-  initialPositions[i + 3] = 0; // data alignment on 16 bytes
-
-  initialVelocities[i + 0] = Math.random() * 0.5;
-  initialVelocities[i + 1] = Math.random() * 0.5;
-  initialVelocities[i + 2] = Math.random() * 0.5;
-  initialVelocities[i + 3] = 0; // data alignment on 16 bytes
-
-  const random = Math.random();
-  if (random < 1 / 3) {
-    colors.set(red, i);
-  } else if (random < 2 / 3) {
-    colors.set(green, i);
-  } else {
-    colors.set(cyan, i);
-  }
-}
-
-function initShaderProgram(gl: WebGLRenderingContext, vsSource: string, fsSource: string): WebGLProgram | null {
-  const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
-  const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+function initProgram(gl: WebGLRenderingContext, vsSource: string, fsSource: string): WebGLProgram | null {
+  const vertexShader = initShader(gl, gl.VERTEX_SHADER, vsSource);
+  const fragmentShader = initShader(gl, gl.FRAGMENT_SHADER, fsSource);
 
   if (!vertexShader || !fragmentShader) {
     return null;
@@ -156,7 +108,7 @@ function initShaderProgram(gl: WebGLRenderingContext, vsSource: string, fsSource
   return shaderProgram;
 }
 
-function loadShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
+function initShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
   const shader = gl.createShader(type);
   if (!shader) {
     return null;
@@ -174,6 +126,13 @@ function loadShader(gl: WebGLRenderingContext, type: number, source: string): We
   return shader;
 }
 
+function createStaticBuffer(gl: WebGL2RenderingContext, data: ArrayBufferView, target: GLenum = gl.ARRAY_BUFFER) {
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(target, buffer);
+  gl.bufferData(target, data, gl.STATIC_DRAW);
+  return buffer;
+}
+
 async function main() {
   const canvas = document.createElement("canvas");
   canvas.width = window.innerWidth * devicePixelRatio;
@@ -186,7 +145,7 @@ async function main() {
     return;
   }
 
-  const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+  const shaderProgram = initProgram(gl, vsSource, fsSource);
   if (!shaderProgram) {
     return;
   }
@@ -196,6 +155,7 @@ async function main() {
     attribLocations: {
       vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
       vertexNormal: gl.getAttribLocation(shaderProgram, "aVertexNormal"),
+      coords: gl.getAttribLocation(shaderProgram, "aCoords"),
     },
     uniformLocations: {
       projectionMatrix: gl.getUniformLocation(shaderProgram, "uProjectionMatrix"),
@@ -204,7 +164,7 @@ async function main() {
       lightDirection: gl.getUniformLocation(shaderProgram, "uLightDirection"),
       lightColor: gl.getUniformLocation(shaderProgram, "uLightColor"),
       ambientColor: gl.getUniformLocation(shaderProgram, "uAmbientColor"),
-      instanceColor: gl.getUniformLocation(shaderProgram, "uInstanceColor"),
+      scale: gl.getUniformLocation(shaderProgram, "uScale"),
       positions: gl.getUniformLocation(shaderProgram, "tPositions"),
       velocities: gl.getUniformLocation(shaderProgram, "tVelocities"),
       colors: gl.getUniformLocation(shaderProgram, "tColors"),
@@ -214,48 +174,72 @@ async function main() {
   // const geometry = createSphereGeometry();
   const geometry = await loadOBJ("fish.obj");
 
-  const positionBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(geometry.positions), gl.STATIC_DRAW);
-
-  const normalBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(geometry.normals), gl.STATIC_DRAW);
-
-  const indexBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(geometry.indices), gl.STATIC_DRAW);
-
-  const renderElement = document.getElementById("render")!;
-  const computeElement = document.getElementById("compute")!;
-  const jsElement = document.getElementById("js")!;
-
-  // Add boids parameters
-  const separationDistance = 8.0;
-  const alignmentDistance = 6.0;
-  const cohesionDistance = 8.0;
-  const borderForce = 0.3;
-  const borderDistance = 50.0;
-  const speed = 0.015;
-
-  let lastTime = performance.now();
-
   const {
     compute: computeBoids,
     coords,
     colorTexture,
   } = useBoidsWebGL(gl, initialPositions, initialVelocities, colors, COUNT);
 
+  const positionBuffer = createStaticBuffer(gl, geometry.positions);
+  const normalBuffer = createStaticBuffer(gl, geometry.normals);
+  const coordsBuffer = createStaticBuffer(gl, coords);
+  const indexBuffer = createStaticBuffer(gl, geometry.indices, gl.ELEMENT_ARRAY_BUFFER);
+
+  const speed = 0.015;
+
+  let lastTime = performance.now();
+
   const ext = gl.getExtension("EXT_disjoint_timer_query_webgl2");
   const query = gl.createQuery();
   gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
   gl.endQuery(ext.TIME_ELAPSED_EXT);
 
-  const computeTime = new MovingAverage(100);
-  const renderTime = new MovingAverage(100);
-  const jsTime = new MovingAverage(100);
+  let measureTarget: "compute" | "render" = "render";
 
-  let measureTarget: "compute" | "render" = "compute";
+  function drawScene(positionsTexture: WebGLTexture, velocitiesTexture: WebGLTexture) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clearDepth(1.0);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    gl.vertexAttribPointer(programInfo.attribLocations.vertexNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(programInfo.attribLocations.vertexNormal);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, coordsBuffer);
+    gl.vertexAttribPointer(programInfo.attribLocations.coords, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(programInfo.attribLocations.coords);
+    gl.vertexAttribDivisor(programInfo.attribLocations.coords, 1);
+
+    gl.useProgram(programInfo.program);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, positionsTexture);
+    gl.uniform1i(programInfo.uniformLocations.positions, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, velocitiesTexture);
+    gl.uniform1i(programInfo.uniformLocations.velocities, 1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, colorTexture);
+    gl.uniform1i(programInfo.uniformLocations.colors, 2);
+
+    gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, renderUniforms.projectionMatrix);
+    gl.uniformMatrix4fv(programInfo.uniformLocations.viewMatrix, false, renderUniforms.viewMatrix);
+    gl.uniform3fv(programInfo.uniformLocations.lightDirection, renderUniforms.lightDirection);
+    gl.uniform3fv(programInfo.uniformLocations.lightColor, renderUniforms.lightColor);
+    gl.uniform3fv(programInfo.uniformLocations.ambientColor, renderUniforms.ambientColor);
+    gl.uniform1f(programInfo.uniformLocations.scale, renderUniforms.scale);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.drawElementsInstanced(gl.TRIANGLES, geometry.indices.length, gl.UNSIGNED_SHORT, 0, COUNT);
+  }
 
   function render() {
     const timeAvailable = gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE);
@@ -266,7 +250,7 @@ async function main() {
     }
 
     const currentTime = performance.now();
-    const deltaTime = (currentTime - lastTime) * speed;
+    boidsUniforms.deltaTime = (currentTime - lastTime) * speed;
     lastTime = currentTime;
 
     const measuredTime = gl.getQueryParameter(query, gl.QUERY_RESULT);
@@ -282,15 +266,7 @@ async function main() {
       measureTarget = "render";
     }
 
-    const { positionsTexture, velocitiesTexture } = computeBoids({
-      deltaTime,
-      separationDistance,
-      alignmentDistance,
-      cohesionDistance,
-      borderForce,
-      borderDistance,
-      bounds: BOUNDS,
-    });
+    const { positionsTexture, velocitiesTexture } = computeBoids(boidsUniforms);
 
     if (measureTarget === "compute") {
       gl.endQuery(ext.TIME_ELAPSED_EXT);
@@ -298,62 +274,7 @@ async function main() {
       gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
     }
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);
-    gl.clearDepth(1.0);
-    gl.enable(gl.DEPTH_TEST);
-    gl.depthFunc(gl.LEQUAL);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-    const fieldOfView = (60 * Math.PI) / 180;
-    const canvas = gl.canvas as HTMLCanvasElement;
-    const aspect = canvas.width / canvas.height;
-    const zNear = 0.1;
-    const zFar = 1000.0;
-    const projectionMatrix = mat4.create();
-
-    mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
-
-    const viewMatrix = mat4.create();
-    mat4.translate(viewMatrix, viewMatrix, [0, 0, -BOUNDS * 2]);
-    mat4.rotateX(viewMatrix, viewMatrix, Math.PI / 6);
-
-    const lightDirection = [0.5, 0.7, 0];
-    const lightColor = [1.5, 1.5, 1.5];
-    const ambientColor = [0.2, 0.2, 0.2];
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-    gl.vertexAttribPointer(programInfo.attribLocations.vertexNormal, 3, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(programInfo.attribLocations.vertexNormal);
-
-    gl.useProgram(programInfo.program);
-
-    gl.activeTexture(gl.TEXTURE6);
-    gl.bindTexture(gl.TEXTURE_2D, positionsTexture);
-    gl.uniform1i(programInfo.uniformLocations.positions, 6);
-    gl.activeTexture(gl.TEXTURE7);
-    gl.bindTexture(gl.TEXTURE_2D, velocitiesTexture);
-    gl.uniform1i(programInfo.uniformLocations.velocities, 7);
-    gl.activeTexture(gl.TEXTURE8);
-    gl.bindTexture(gl.TEXTURE_2D, colorTexture);
-    gl.uniform1i(programInfo.uniformLocations.colors, 8);
-
-    gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
-    gl.uniformMatrix4fv(programInfo.uniformLocations.viewMatrix, false, viewMatrix);
-    gl.uniform3fv(programInfo.uniformLocations.lightDirection, lightDirection);
-    gl.uniform3fv(programInfo.uniformLocations.lightColor, lightColor);
-    gl.uniform3fv(programInfo.uniformLocations.ambientColor, ambientColor);
-
-    const vertexCount = geometry.indices.length;
-    const type = gl.UNSIGNED_SHORT;
-    const offset = 0;
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    gl.drawElementsInstanced(gl.TRIANGLES, vertexCount, type, offset, COUNT);
+    drawScene(positionsTexture, velocitiesTexture);
 
     if (measureTarget === "render") {
       gl.endQuery(ext.TIME_ELAPSED_EXT);
@@ -364,6 +285,7 @@ async function main() {
 
     requestAnimationFrame(render);
   }
+
   render();
 }
 
