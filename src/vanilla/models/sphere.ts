@@ -1,4 +1,4 @@
-export function createSphereGeometry(radius = 0.5, stacks = 18, slices = 36) {
+export function createSphereGeometry(radius = 1, stacks = 18, slices = 36) {
   const positions: number[] = [];
   const normals: number[] = [];
   const indices: number[] = [];

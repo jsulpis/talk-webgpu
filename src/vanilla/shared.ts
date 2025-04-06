@@ -41,9 +41,13 @@ const green = [0, 1, 0, 1];
 const cyan = [0, 0.5, 1, 1];
 
 for (let i = 0; i < initialVelocities.length; i += 4) {
-  initialPositions[i + 0] = (Math.random() - 0.5) * BOUNDS;
-  initialPositions[i + 1] = (Math.random() - 0.5) * BOUNDS;
-  initialPositions[i + 2] = (Math.random() - 0.5) * BOUNDS;
+  const theta = Math.random() * 2 * Math.PI;
+  const phi = Math.acos(2 * Math.random() - 1);
+  const radius = Math.cbrt(Math.random()) * BOUNDS * 1.5;
+
+  initialPositions[i + 0] = radius * Math.sin(phi) * Math.cos(theta);
+  initialPositions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
+  initialPositions[i + 2] = radius * Math.cos(phi);
   initialPositions[i + 3] = 0; // data alignment on 16 bytes
 
   initialVelocities[i + 0] = Math.random() * 0.5;

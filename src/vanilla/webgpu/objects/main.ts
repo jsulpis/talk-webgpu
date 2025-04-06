@@ -1,10 +1,9 @@
-import { loadOBJ } from "../../models/objLoader";
 import { createSphereGeometry } from "../../models/sphere";
 import { colors, initialPositions, jsElement, jsTime, renderElement, renderTime, renderUniforms } from "../../shared";
 import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "../utils";
 import shaderSource from "./render.wgsl?raw";
 
-const COUNT = 30000;
+const COUNT = 10000;
 
 document.getElementById("objects")!.innerText = COUNT.toString();
 document.getElementById("api")!.innerText = "WebGPU";
@@ -118,8 +117,7 @@ async function main() {
     label: "Depth Texture",
   });
 
-  const geometry = createSphereGeometry(1.0);
-  // const geometry = await loadOBJ("fish.obj");
+  const geometry = createSphereGeometry(1, 9, 18);
 
   const positionBuffer = device.createBuffer({
     size: geometry.positions.byteLength,
@@ -227,7 +225,7 @@ async function main() {
 
   const renderBundle = bundleEncoder.finish();
 
-  const renderMode: "naive" | "bundle" = "bundle";
+  const renderMode: "naive" | "bundle" = "naive";
 
   function drawScene() {
     const commandEncoder = device.createCommandEncoder({

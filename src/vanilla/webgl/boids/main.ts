@@ -1,4 +1,4 @@
-import { loadOBJ } from "../models/objLoader";
+import { loadOBJ } from "../../models/objLoader";
 import { useBoidsWebGL } from "./gpgpu";
 import {
   boidsUniforms,
@@ -14,8 +14,8 @@ import {
   renderTime,
   renderUniforms,
   speed,
-} from "../shared";
-import { initProgram, createStaticBuffer } from "./utils";
+} from "../../shared";
+import { initProgram, createStaticBuffer } from "../utils";
 import vsSource from "./shaders/render.vert?raw";
 import fsSource from "./shaders/render.frag?raw";
 

@@ -1,5 +1,5 @@
-import { BoidsUniforms } from "../shared";
-import { createDataTexture, initProgram } from "./utils";
+import { BoidsUniforms } from "../../shared";
+import { createDataTexture, initProgram } from "../utils";
 import updatePositionsFragmentShader from "./shaders/positions.frag?raw";
 import updateVelocitiesFragmentShader from "./shaders/velocities.frag?raw";
 import vertexShader from "./shaders/compute.vert?raw";
