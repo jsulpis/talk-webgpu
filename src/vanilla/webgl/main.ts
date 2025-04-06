@@ -1,5 +1,5 @@
-import { loadOBJ } from "./models/objLoader";
-import { useBoidsWebGL } from "../boids/webgl";
+import { loadOBJ } from "../models/objLoader";
+import { useBoidsWebGL } from "./gpgpu";
 import {
   boidsUniforms,
   colors,
@@ -14,125 +14,13 @@ import {
   renderTime,
   renderUniforms,
   speed,
-} from "./shared";
+} from "../shared";
+import { initProgram, createStaticBuffer } from "./utils";
+import vsSource from "./shaders/render.vert?raw";
+import fsSource from "./shaders/render.frag?raw";
 
 document.getElementById("objects")!.innerText = COUNT.toString();
 document.getElementById("api")!.innerText = "WebGL";
-
-// Vertex shader program
-const vsSource = `#version 300 es
-    precision highp float;
-    in vec4 aVertexPosition;
-    in vec3 aVertexNormal;
-    in vec2 aCoords;
-    uniform mat4 uProjectionMatrix;
-    uniform mat4 uViewMatrix;
-    uniform mat4 uModelMatrix;
-    uniform vec3 uLightDirection;
-    uniform vec3 uLightColor;
-    uniform vec3 uAmbientColor;
-    uniform float uScale;
-    uniform sampler2D tPositions;
-    uniform sampler2D tVelocities;
-    uniform sampler2D tColors;
-    out vec4 vColor;
-    out vec3 vNormal;
-    out vec3 vLightDirection;
-
-    void main(void) {
-      vec3 modelPosition = texture(tPositions, aCoords).xyz;
-
-      // Construct a rotation matrix that aligns the object's forward axis with the velocity direction
-      vec3 velocity = texture(tVelocities, aCoords).xyz;
-      vec3 forward = normalize(velocity);
-      vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), forward));
-      vec3 up = cross(forward, right);
-
-      mat4 rotationMatrix = mat4(
-        right.x, right.y, right.z, 0.0,
-        up.x, up.y, up.z, 0.0,
-        forward.x, forward.y, forward.z, 0.0,
-        0.0, 0.0, 0.0, 1.0
-      );
-
-      mat4 modelMatrix = mat4(
-        uScale * rotationMatrix[0][0], uScale * rotationMatrix[0][1], uScale * rotationMatrix[0][2], 0.0,
-        uScale * rotationMatrix[1][0], uScale * rotationMatrix[1][1], uScale * rotationMatrix[1][2], 0.0,
-        uScale * rotationMatrix[2][0], uScale * rotationMatrix[2][1], uScale * rotationMatrix[2][2], 0.0,
-        modelPosition.x, modelPosition.y, modelPosition.z, 1.0
-      );
-      mat4 modelViewMatrix = uViewMatrix * modelMatrix;
-
-      gl_Position = uProjectionMatrix * modelViewMatrix * aVertexPosition;
-      vNormal = mat3(modelViewMatrix) * aVertexNormal;
-      vLightDirection = (uViewMatrix * vec4(uLightDirection, 0.0)).xyz;
-
-      vec4 color = texture(tColors, aCoords).rgba;
-      vec3 vertexNormal = (modelViewMatrix * vec4(aVertexNormal, 0.0)).xyz;
-      vec3 lightDirection = (uViewMatrix * vec4(uLightDirection, 0.0)).xyz;
-      vec3 diffuse = uLightColor * max(dot(vertexNormal, lightDirection), 0.0);
-      vec3 ambient = uAmbientColor;
-
-      vColor = vec4((diffuse + ambient) * color.rgb, color.a);
-    }
-`;
-
-// Fragment shader program
-const fsSource = `#version 300 es
-    precision highp float;
-    in vec4 vColor;
-    out vec4 fragColor;
-
-    void main(void) {
-      fragColor = vColor;
-    }
-`;
-
-function initProgram(gl: WebGLRenderingContext, vsSource: string, fsSource: string): WebGLProgram | null {
-  const vertexShader = initShader(gl, gl.VERTEX_SHADER, vsSource);
-  const fragmentShader = initShader(gl, gl.FRAGMENT_SHADER, fsSource);
-
-  if (!vertexShader || !fragmentShader) {
-    return null;
-  }
-
-  const shaderProgram = gl.createProgram();
-  gl.attachShader(shaderProgram, vertexShader);
-  gl.attachShader(shaderProgram, fragmentShader);
-  gl.linkProgram(shaderProgram);
-
-  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-    console.error("Unable to initialize the shader program: " + gl.getProgramInfoLog(shaderProgram));
-    return null;
-  }
-
-  return shaderProgram;
-}
-
-function initShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
-  const shader = gl.createShader(type);
-  if (!shader) {
-    return null;
-  }
-
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error("An error occurred compiling the shaders: " + gl.getShaderInfoLog(shader));
-    gl.deleteShader(shader);
-    return null;
-  }
-
-  return shader;
-}
-
-function createStaticBuffer(gl: WebGL2RenderingContext, data: ArrayBufferView, target: GLenum = gl.ARRAY_BUFFER) {
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(target, buffer);
-  gl.bufferData(target, data, gl.STATIC_DRAW);
-  return buffer;
-}
 
 async function main() {
   const canvas = document.createElement("canvas");
@@ -188,12 +76,7 @@ async function main() {
 
   let lastTime = performance.now();
 
-  const ext = gl.getExtension("EXT_disjoint_timer_query_webgl2");
-  const query = gl.createQuery();
-  gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
-  gl.endQuery(ext.TIME_ELAPSED_EXT);
-
-  let measureTarget: "compute" | "render" = "render";
+  const { isGPUTimeAvailable, updateGPUTime, getGPUTime, endGPUTime } = useGPUTimer(gl);
 
   function drawScene(positionsTexture: WebGLTexture, velocitiesTexture: WebGLTexture) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -241,8 +124,7 @@ async function main() {
   }
 
   function render() {
-    const timeAvailable = gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE);
-    if (!timeAvailable) {
+    if (!isGPUTimeAvailable()) {
       // still computing the previous frame, skip this frame
       requestAnimationFrame(render);
       return;
@@ -252,6 +134,36 @@ async function main() {
     boidsUniforms.deltaTime = (currentTime - lastTime) * speed;
     lastTime = currentTime;
 
+    getGPUTime();
+    const { positionsTexture, velocitiesTexture } = computeBoids(boidsUniforms);
+    updateGPUTime();
+    drawScene(positionsTexture, velocitiesTexture);
+    endGPUTime();
+
+    jsTime.addValue(performance.now() - lastTime);
+    jsElement.textContent = jsTime.getAverage().toFixed(1) + "ms";
+
+    requestAnimationFrame(render);
+  }
+
+  render();
+}
+
+window.onload = main;
+
+function useGPUTimer(gl: WebGL2RenderingContext) {
+  const ext = gl.getExtension("EXT_disjoint_timer_query_webgl2");
+  const query = gl.createQuery();
+  gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
+  gl.endQuery(ext.TIME_ELAPSED_EXT);
+
+  let measureTarget: "compute" | "render" = "render";
+
+  function isGPUTimeAvailable() {
+    return gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE);
+  }
+
+  function getGPUTime() {
     const measuredTime = gl.getQueryParameter(query, gl.QUERY_RESULT);
 
     if (measureTarget === "render") {
@@ -264,28 +176,26 @@ async function main() {
       computeElement.textContent = computeTime.getAverage().toFixed(1) + "ms";
       measureTarget = "render";
     }
+  }
 
-    const { positionsTexture, velocitiesTexture } = computeBoids(boidsUniforms);
-
+  function updateGPUTime() {
     if (measureTarget === "compute") {
       gl.endQuery(ext.TIME_ELAPSED_EXT);
     } else {
       gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
     }
+  }
 
-    drawScene(positionsTexture, velocitiesTexture);
-
+  function endGPUTime() {
     if (measureTarget === "render") {
       gl.endQuery(ext.TIME_ELAPSED_EXT);
     }
-
-    jsTime.addValue(performance.now() - lastTime);
-    jsElement.textContent = jsTime.getAverage().toFixed(1) + "ms";
-
-    requestAnimationFrame(render);
   }
 
-  render();
+  return {
+    isGPUTimeAvailable,
+    getGPUTime,
+    updateGPUTime,
+    endGPUTime,
+  };
 }
-
-window.onload = main;

@@ -71,6 +71,8 @@ export const boidsUniforms = {
   bounds: BOUNDS,
 };
 
+export type BoidsUniforms = typeof boidsUniforms;
+
 const fieldOfView = (60 * Math.PI) / 180;
 const aspect = window.innerWidth / window.innerHeight;
 const zNear = 0.1;
