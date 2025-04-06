@@ -1,5 +1,5 @@
-import { BoidsUniforms, computeElement, computeTime } from "../shared";
-import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "./utils";
+import { BoidsUniforms, computeElement, computeTime } from "../../shared";
+import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "../utils";
 import computeShaderSource from "./shaders/compute.wgsl?raw";
 
 export function useBoidsGPU(

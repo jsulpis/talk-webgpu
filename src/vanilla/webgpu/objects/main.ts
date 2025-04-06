@@ -1,20 +1,10 @@
-import { useBoidsGPU } from "./gpgpu";
-import { loadOBJ } from "../models/objLoader";
-import {
-  boidsUniforms,
-  colors,
-  COUNT,
-  initialPositions,
-  initialVelocities,
-  jsElement,
-  jsTime,
-  renderElement,
-  renderTime,
-  renderUniforms,
-  speed,
-} from "../shared";
-import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "./utils";
-import shaderSource from "./shaders/render.wgsl?raw";
+import { loadOBJ } from "../../models/objLoader";
+import { createSphereGeometry } from "../../models/sphere";
+import { colors, initialPositions, jsElement, jsTime, renderElement, renderTime, renderUniforms } from "../../shared";
+import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "../utils";
+import shaderSource from "./render.wgsl?raw";
+
+const COUNT = 30000;
 
 document.getElementById("objects")!.innerText = COUNT.toString();
 document.getElementById("api")!.innerText = "WebGPU";
@@ -65,30 +55,16 @@ async function main() {
     entries: [
       {
         binding: 0,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX,
         buffer: {
           type: "uniform",
         },
       },
       {
-        binding: 1, // positions
+        binding: 1,
         visibility: GPUShaderStage.VERTEX,
         buffer: {
-          type: "read-only-storage",
-        },
-      },
-      {
-        binding: 2, // velocities
-        visibility: GPUShaderStage.VERTEX,
-        buffer: {
-          type: "read-only-storage",
-        },
-      },
-      {
-        binding: 3, // colors
-        visibility: GPUShaderStage.VERTEX,
-        buffer: {
-          type: "read-only-storage",
+          type: "uniform",
         },
       },
     ],
@@ -142,8 +118,8 @@ async function main() {
     label: "Depth Texture",
   });
 
-  // const geometry = createSphereGeometry(1.0);
-  const geometry = await loadOBJ("fish.obj");
+  const geometry = createSphereGeometry(1.0);
+  // const geometry = await loadOBJ("fish.obj");
 
   const positionBuffer = device.createBuffer({
     size: geometry.positions.byteLength,
@@ -173,8 +149,6 @@ async function main() {
   });
   device.queue.writeBuffer(indexBuffer, 0, geometry.indices);
 
-  let lastTime = performance.now();
-
   // Create uniform buffer for view/projection matrices and lighting
   const uniformBufferSize = 196; // Size for:
   // - projectionMatrix (mat4x4f): 64 bytes
@@ -202,9 +176,60 @@ async function main() {
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
-  const computeBoids = useBoidsGPU(device, initialPositions, initialVelocities, colorsBuffer, COUNT);
+  const objectsData: Array<{ bindGroup: GPUBindGroup }> = [];
 
-  function drawScene(positionsBuffer: GPUBuffer, velocitiesBuffer: GPUBuffer) {
+  const modelUniformsData = new Float32Array(16);
+  let modelUniform;
+  for (let i = 0; i < COUNT; i++) {
+    modelUniform = {
+      position: initialPositions.slice(i * 4, i * 4 + 4),
+      color: colors.slice(i * 4, i * 4 + 4),
+      scale: Math.random() * 0.5 + 0.5,
+    };
+    modelUniformsData.set(modelUniform.position, 0);
+    modelUniformsData.set(modelUniform.color, 4);
+    modelUniformsData[8] = modelUniform.scale;
+    const modelUniformsBuffer = device.createBuffer({
+      size: modelUniformsData.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      label: `modelUniforms Buffer ${i}`,
+    });
+    device.queue.writeBuffer(modelUniformsBuffer, 0, modelUniformsData);
+
+    const bindGroup = device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: uniformBuffer } },
+        { binding: 1, resource: { buffer: modelUniformsBuffer } },
+      ],
+      label: `Render Bind Group ${i}`,
+    });
+
+    objectsData.push({
+      bindGroup,
+    });
+  }
+
+  const bundleEncoder = device.createRenderBundleEncoder({
+    colorFormats: [format],
+    depthStencilFormat: "depth24plus",
+  });
+
+  for (let objectData of objectsData) {
+    bundleEncoder.setPipeline(pipeline);
+    bundleEncoder.setVertexBuffer(0, positionBuffer);
+    bundleEncoder.setVertexBuffer(1, normalBuffer);
+    bundleEncoder.setIndexBuffer(indexBuffer, "uint16");
+
+    bundleEncoder.setBindGroup(0, objectData.bindGroup);
+    bundleEncoder.drawIndexed(geometry.indices.length);
+  }
+
+  const renderBundle = bundleEncoder.finish();
+
+  const renderMode: "naive" | "bundle" = "bundle";
+
+  function drawScene() {
     const commandEncoder = device.createCommandEncoder({
       label: "Render Command Encoder",
     });
@@ -227,27 +252,22 @@ async function main() {
       timestampWrites,
     });
 
-    renderPass.setPipeline(pipeline);
+    if (renderMode === "naive") {
+      for (let objectData of objectsData) {
+        renderPass.setPipeline(pipeline);
+        renderPass.setVertexBuffer(0, positionBuffer);
+        renderPass.setVertexBuffer(1, normalBuffer);
+        renderPass.setIndexBuffer(indexBuffer, "uint16");
 
-    const bindGroup = device.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: uniformBuffer } },
-        { binding: 1, resource: { buffer: positionsBuffer } },
-        { binding: 2, resource: { buffer: velocitiesBuffer } },
-        { binding: 3, resource: { buffer: colorsBuffer } },
-      ],
-      label: "Render Bind Group",
-    });
-    renderPass.setBindGroup(0, bindGroup);
-
-    renderPass.setVertexBuffer(0, positionBuffer);
-    renderPass.setVertexBuffer(1, normalBuffer);
-    renderPass.setIndexBuffer(indexBuffer, "uint16");
-
-    renderPass.drawIndexed(geometry.indices.length, COUNT, 0, 0, 0);
+        renderPass.setBindGroup(0, objectData.bindGroup);
+        renderPass.drawIndexed(geometry.indices.length);
+      }
+    } else {
+      renderPass.executeBundles([renderBundle]);
+    }
 
     renderPass.end();
+
     resolveTimingQuery(querySet, resultBuffer, commandEncoder, resolveBuffer);
     device.queue.submit([commandEncoder.finish()]);
 
@@ -261,16 +281,12 @@ async function main() {
 
   function render() {
     const currentTime = performance.now();
-    boidsUniforms.deltaTime = (currentTime - lastTime) * speed;
 
-    const { positionsBuffer, velocitiesBuffer } = computeBoids(boidsUniforms);
-
-    drawScene(positionsBuffer, velocitiesBuffer);
+    drawScene();
 
     jsTime.addValue(performance.now() - currentTime);
     jsElement.textContent = jsTime.getAverage().toFixed(1) + "ms";
 
-    lastTime = currentTime;
     requestAnimationFrame(render);
   }
 
