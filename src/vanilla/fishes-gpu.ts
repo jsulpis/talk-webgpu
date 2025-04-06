@@ -1,11 +1,8 @@
-import { useBoidsGPU } from "../boids/webgpu";
-import { createSphereGeometry } from "./models/sphere";
+import { resolveTimingQuery, initTimingObjects, readTimingBuffer, useBoidsGPU } from "../boids/webgpu";
 import { loadOBJ } from "./models/objLoader";
 import {
   boidsUniforms,
   colors,
-  computeElement,
-  computeTime,
   COUNT,
   initialPositions,
   initialVelocities,
@@ -95,13 +92,17 @@ async function main() {
     return;
   }
 
-  const adapter = await navigator.gpu.requestAdapter();
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
   if (!adapter) {
     console.error("No GPU adapter found");
     return;
   }
 
-  const device = await adapter.requestDevice();
+  const device = await adapter.requestDevice({
+    requiredFeatures: ["timestamp-query"],
+  });
+
+  const { querySet, resolveBuffer, resultBuffer, timestampWrites } = initTimingObjects(device);
 
   const canvas = document.createElement("canvas");
   canvas.width = window.innerWidth * devicePixelRatio;
@@ -275,6 +276,7 @@ async function main() {
       label: "Render Command Encoder",
     });
     const renderPass = commandEncoder.beginRenderPass({
+      label: "Render Pass",
       colorAttachments: [
         {
           view: context.getCurrentTexture().createView(),
@@ -289,7 +291,7 @@ async function main() {
         depthLoadOp: "clear",
         depthStoreOp: "store",
       },
-      label: "Render Pass",
+      timestampWrites,
     });
 
     renderPass.setPipeline(pipeline);
@@ -313,36 +315,30 @@ async function main() {
     renderPass.drawIndexed(geometry.indices.length, COUNT, 0, 0, 0);
 
     renderPass.end();
+    resolveTimingQuery(querySet, resultBuffer, commandEncoder, resolveBuffer);
     device.queue.submit([commandEncoder.finish()]);
+
+    readTimingBuffer(resultBuffer).then((measure) => {
+      if (measure && measure > 0) {
+        renderTime.addValue(measure);
+        renderElement.textContent = renderTime.getAverage().toFixed(1) + "ms";
+      }
+    });
   }
 
   function render() {
-    performance.mark("compute");
-    performance.mark("js");
-
     const currentTime = performance.now();
     boidsUniforms.deltaTime = (currentTime - lastTime) * speed;
-    lastTime = currentTime;
 
-    computeBoids(boidsUniforms).then(({ positionsBuffer, velocitiesBuffer }) => {
-      const compute = performance.measure("compute", "compute");
-      computeTime.addValue(compute.duration);
-      computeElement.textContent = computeTime.getAverage().toFixed(1) + "ms";
+    const { positionsBuffer, velocitiesBuffer } = computeBoids(boidsUniforms);
 
-      performance.mark("render");
+    drawScene(positionsBuffer, velocitiesBuffer);
 
-      drawScene(positionsBuffer, velocitiesBuffer);
-
-      const measure = performance.measure("render", "render");
-      renderTime.addValue(measure.duration);
-      renderElement.textContent = renderTime.getAverage().toFixed(1) + "ms";
-
-      requestAnimationFrame(render);
-    });
-
-    const measure = performance.measure("js", "js");
-    jsTime.addValue(measure.duration);
+    jsTime.addValue(performance.now() - currentTime);
     jsElement.textContent = jsTime.getAverage().toFixed(1) + "ms";
+
+    lastTime = currentTime;
+    requestAnimationFrame(render);
   }
 
   render();
