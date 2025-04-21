@@ -41,7 +41,7 @@ void main() {
         vec2 otherUv = vec2(x, y);
 
         // Skip self
-        if (distance(otherUv, vUv) < 0.001)
+        if (distance(otherUv, vUv) < 1.0 / resolution.x)
           continue;
 
         vec3 otherPosition = texture(positions, otherUv).xyz;
