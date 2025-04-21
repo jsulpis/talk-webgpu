@@ -1,0 +1,153 @@
+---
+import Layout from "../../layouts/Layout.astro";
+---
+
+<script>
+  import { colors, initialPositions, jsElement, jsTime, renderElement, renderTime, renderUniforms } from "../../shared";
+  import vsSource from "../../webgl/objects/render.vert?raw";
+  import fsSource from "../../webgl/objects/render.frag?raw";
+  import { createStaticBuffer, initProgram } from "../../webgl/utils";
+  import { createSphereGeometry } from "../../models/sphere";
+
+  const COUNT = 10000;
+
+  document.getElementById("objects")!.innerText = COUNT.toString();
+
+  async function main() {
+    const canvas = document.querySelector("canvas")!;
+    canvas.width = window.innerWidth * devicePixelRatio;
+    canvas.height = window.innerHeight * devicePixelRatio;
+
+    const gl = canvas.getContext("webgl2", { powerPreference: "high-performance" })!;
+    if (!gl) {
+      console.error("Unable to initialize WebGL. Your browser or machine may not support it.");
+      return;
+    }
+
+    const shaderProgram = initProgram(gl, vsSource, fsSource);
+    if (!shaderProgram) {
+      return;
+    }
+
+    const programInfo = {
+      program: shaderProgram,
+      attribLocations: {
+        vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
+        vertexNormal: gl.getAttribLocation(shaderProgram, "aVertexNormal"),
+        coords: gl.getAttribLocation(shaderProgram, "aCoords"),
+      },
+      uniformLocations: {
+        projectionMatrix: gl.getUniformLocation(shaderProgram, "uProjectionMatrix"),
+        viewMatrix: gl.getUniformLocation(shaderProgram, "uViewMatrix"),
+        lightDirection: gl.getUniformLocation(shaderProgram, "uLightDirection"),
+        lightColor: gl.getUniformLocation(shaderProgram, "uLightColor"),
+        ambientColor: gl.getUniformLocation(shaderProgram, "uAmbientColor"),
+        position: gl.getUniformLocation(shaderProgram, "uPosition"),
+        color: gl.getUniformLocation(shaderProgram, "uColor"),
+        scale: gl.getUniformLocation(shaderProgram, "uScale"),
+      },
+    };
+
+    const geometry = createSphereGeometry(1, 9, 18);
+
+    const positionBuffer = createStaticBuffer(gl, geometry.positions);
+    const normalBuffer = createStaticBuffer(gl, geometry.normals);
+    const indexBuffer = createStaticBuffer(gl, geometry.indices, gl.ELEMENT_ARRAY_BUFFER);
+
+    const objectsData = Array.from({ length: COUNT }).map((_, i) => ({
+      position: initialPositions.slice(i * 4, i * 4 + 4),
+      color: colors.slice(i * 4, i * 4 + 4),
+      scale: Math.random() * 0.5 + 0.5,
+    }));
+
+    const { isGPUTimeAvailable, getGPUTime, endGPUTime } = useGPUTimer(gl);
+
+    function drawScene() {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+      gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl.clearDepth(1.0);
+      gl.enable(gl.DEPTH_TEST);
+      gl.depthFunc(gl.LEQUAL);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+      for (let objectData of objectsData) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.vertexAttribPointer(programInfo.attribLocations.vertexNormal, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(programInfo.attribLocations.vertexNormal);
+
+        gl.useProgram(programInfo.program);
+
+        gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, renderUniforms.projectionMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.viewMatrix, false, renderUniforms.viewMatrix);
+        gl.uniform3fv(programInfo.uniformLocations.lightDirection, renderUniforms.lightDirection);
+        gl.uniform3fv(programInfo.uniformLocations.lightColor, renderUniforms.lightColor);
+        gl.uniform3fv(programInfo.uniformLocations.ambientColor, renderUniforms.ambientColor);
+        gl.uniform4fv(programInfo.uniformLocations.position, objectData.position);
+        gl.uniform4fv(programInfo.uniformLocations.color, objectData.color);
+        gl.uniform1f(programInfo.uniformLocations.scale, objectData.scale);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+        gl.drawElements(gl.TRIANGLES, geometry.indices.length, gl.UNSIGNED_SHORT, 0);
+      }
+    }
+
+    function render() {
+      if (!isGPUTimeAvailable()) {
+        // still computing the previous frame, skip this frame
+        requestAnimationFrame(render);
+        return;
+      }
+
+      const currentTime = performance.now();
+
+      getGPUTime();
+      drawScene();
+      endGPUTime();
+
+      jsTime.addValue(performance.now() - currentTime);
+      jsElement.textContent = jsTime.getAverage().toFixed(1) + "ms";
+
+      requestAnimationFrame(render);
+    }
+
+    render();
+  }
+
+  window.onload = main;
+
+  function useGPUTimer(gl: WebGL2RenderingContext) {
+    const ext = gl.getExtension("EXT_disjoint_timer_query_webgl2");
+    const query = gl.createQuery();
+    gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
+    gl.endQuery(ext.TIME_ELAPSED_EXT);
+
+    function isGPUTimeAvailable() {
+      return gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE);
+    }
+
+    function getGPUTime() {
+      const measuredTime = gl.getQueryParameter(query, gl.QUERY_RESULT);
+
+      renderTime.addValue(measuredTime / 1e6);
+      renderElement.textContent = renderTime.getAverage().toFixed(1) + "ms";
+      gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
+    }
+
+    function endGPUTime() {
+      gl.endQuery(ext.TIME_ELAPSED_EXT);
+    }
+
+    return {
+      isGPUTimeAvailable,
+      getGPUTime,
+      endGPUTime,
+    };
+  }
+</script>
+
+<Layout api="WebGL" />

@@ -1,0 +1,86 @@
+---
+interface Props {
+  api: "WebGL" | "WebGPU";
+}
+
+const { api } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>Demo</title>
+  </head>
+  <body>
+    <nav class="panel">
+      <ul>
+        <li><a href="/three/instanced">three - instanced</a></li>
+        <li><a href="/three/instanced-webgpu">three - instanced WebGPU</a></li>
+        <li><a href="/three/fishes">three - fishes</a></li>
+        <li><a href="/three/fishes-webgpu">three - fishes WebGPU</a></li>
+        <li><a href="/webgl/boids">webgl - boids</a></li>
+        <li><a href="/webgl/objects">webgl - objects</a></li>
+        <li><a href="/webgpu/boids">webgpu - boids</a></li>
+        <li><a href="/webgpu/objects">webgpu - objects</a></li>
+      </ul>
+    </nav>
+    <canvas></canvas>
+    <div class="stats panel">
+      <p>api: <strong id="api">{api}</strong></p>
+      <p>objects: <strong id="objects"></strong></p>
+      <p>compute: <strong id="compute"></strong></p>
+      <p>render: <strong id="render"></strong></p>
+      <p>JS: <strong id="js"></strong></p>
+    </div>
+  </body>
+</html>
+
+<style>
+  body {
+    margin: 0;
+  }
+  nav {
+    bottom: 1rem;
+    right: 1rem;
+
+    ul {
+      font-size: 1rem;
+      line-height: 1.25;
+      padding: 0;
+      margin: 0;
+      list-style-type: none;
+    }
+
+    a {
+      color: inherit;
+    }
+  }
+  .panel {
+    position: absolute;
+    background: white;
+    padding: 1rem;
+    border-radius: 0.25em;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 1.5rem;
+  }
+  .stats {
+    bottom: 1rem;
+    left: 1rem;
+
+    p:has(strong:empty) {
+      display: none;
+    }
+  }
+  p {
+    margin: 0;
+  }
+  canvas {
+    width: 100svw;
+    height: 100svh;
+    display: block;
+  }
+</style>

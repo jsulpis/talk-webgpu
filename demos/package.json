@@ -1,0 +1,20 @@
+{
+  "name": "demos",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "astro": "astro",
+    "build": "astro build",
+    "dev": "astro dev",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^5.7.4"
+  },
+  "devDependencies": {
+    "@types/three": "0.175.0",
+    "@webgpu/types": "0.1.60",
+    "gl-matrix": "3.4.3",
+    "three": "0.175.0"
+  }
+}
