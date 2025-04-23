@@ -12,9 +12,11 @@
     "astro": "^5.7.4"
   },
   "devDependencies": {
+    "@tweakpane/core": "2.0.5",
     "@types/three": "0.175.0",
     "@webgpu/types": "0.1.60",
     "gl-matrix": "3.4.3",
-    "three": "0.175.0"
+    "three": "0.175.0",
+    "tweakpane": "4.0.5"
   }
 }

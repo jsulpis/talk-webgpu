@@ -1,4 +1,5 @@
-import { type BoidsUniforms, computeElement, computeTime } from "../../shared";
+import type { Params } from "../../commons/tweakpane";
+import { type BoidsUniforms, computeTime } from "../../shared";
 import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "../utils";
 import computeShaderSource from "./shaders/compute.wgsl?raw";
 
@@ -7,7 +8,7 @@ export function useBoidsGPU(
   initialPositions: Float32Array,
   initialVelocities: Float32Array,
   colorsBuffer: GPUBuffer,
-  count: number
+  params: Params
 ) {
   const { querySet, resultBuffer, resolveBuffer, timestampWrites } = initTimingObjects(device);
 
@@ -111,7 +112,7 @@ export function useBoidsGPU(
     const computePass = computeEncoder.beginComputePass({ timestampWrites });
     computePass.setPipeline(computePipeline);
     computePass.setBindGroup(0, direction === "AtoB" ? computeBindGroupA : computeBindGroupB);
-    computePass.dispatchWorkgroups(Math.ceil(count / 64));
+    computePass.dispatchWorkgroups(Math.ceil(params.objects / 64));
 
     computePass.end();
     resolveTimingQuery(querySet, resultBuffer, computeEncoder, resolveBuffer);
@@ -120,7 +121,7 @@ export function useBoidsGPU(
     readTimingBuffer(resultBuffer).then((measure) => {
       if (measure && measure > 0) {
         computeTime.addValue(measure);
-        computeElement.textContent = computeTime.getAverage().toFixed(1) + "ms";
+        params.computeTime = computeTime.getAverage().toFixed(1) + "ms";
       }
     });
 

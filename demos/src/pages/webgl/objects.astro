@@ -3,15 +3,21 @@ import Layout from "../../layouts/Layout.astro";
 ---
 
 <script>
-  import { colors, initialPositions, jsElement, jsTime, renderElement, renderTime, renderUniforms } from "../../shared";
+  import { colors, COUNT, initialPositions, jsTime, renderTime, renderUniforms, canvasBackground } from "../../shared";
   import vsSource from "../../webgl/objects/render.vert?raw";
   import fsSource from "../../webgl/objects/render.frag?raw";
   import { createStaticBuffer, initProgram } from "../../webgl/utils";
   import { createSphereGeometry } from "../../models/sphere";
+  import { createPane, type Params } from "../../commons/tweakpane";
 
-  const COUNT = 10000;
+  const params: Params = {
+    api: "WebGL",
+    objects: COUNT,
+    jsTime: "0ms",
+    renderTime: "0ms",
+  };
 
-  document.getElementById("objects")!.innerText = COUNT.toString();
+  createPane(params);
 
   async function main() {
     const canvas = document.querySelector("canvas")!;
@@ -57,18 +63,25 @@ import Layout from "../../layouts/Layout.astro";
     const objectsData = Array.from({ length: COUNT }).map((_, i) => ({
       position: initialPositions.slice(i * 4, i * 4 + 4),
       color: colors.slice(i * 4, i * 4 + 4),
-      scale: Math.random() * 0.5 + 0.5,
+      scale: Math.random() * 0.5 + 1,
     }));
+
+    // Sort the objects so that the closest ones are drawn first to improve overdraw
+    objectsData.sort((a, b) => {
+      return b.position[2] - a.position[2];
+    });
 
     const { isGPUTimeAvailable, getGPUTime, endGPUTime } = useGPUTimer(gl);
 
     function drawScene() {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-      gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl.clearColor(...canvasBackground);
       gl.clearDepth(1.0);
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
+      gl.enable(gl.CULL_FACE);
+      gl.cullFace(gl.BACK);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
       for (let objectData of objectsData) {
@@ -110,7 +123,7 @@ import Layout from "../../layouts/Layout.astro";
       endGPUTime();
 
       jsTime.addValue(performance.now() - currentTime);
-      jsElement.textContent = jsTime.getAverage().toFixed(1) + "ms";
+      params.jsTime = jsTime.getAverage().toFixed(1) + "ms";
 
       requestAnimationFrame(render);
     }
@@ -134,7 +147,7 @@ import Layout from "../../layouts/Layout.astro";
       const measuredTime = gl.getQueryParameter(query, gl.QUERY_RESULT);
 
       renderTime.addValue(measuredTime / 1e6);
-      renderElement.textContent = renderTime.getAverage().toFixed(1) + "ms";
+      params.renderTime = renderTime.getAverage().toFixed(1) + "ms";
       gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
     }
 

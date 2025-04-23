@@ -24,7 +24,6 @@ export const BOUNDS = 100;
 
 export const renderElement = document.getElementById("render")!;
 export const computeElement = document.getElementById("compute")!;
-export const jsElement = document.getElementById("js")!;
 
 export const computeTime = new MovingAverage(100);
 export const renderTime = new MovingAverage(100);
@@ -36,14 +35,16 @@ export let initialPositions = new Float32Array(COUNT * 4);
 export let initialVelocities = new Float32Array(COUNT * 4);
 export let colors = new Float32Array(COUNT * 4);
 
-const red = [1, 0, 0, 1];
-const green = [0, 1, 0, 1];
-const cyan = [0, 0.5, 1, 1];
+const red = [1, 0.7, 0.1, 1];
+const green = [0, 0.3, 1, 1];
+const cyan = [0, 0.7, 1, 1];
+
+export const canvasBackground = [0.85, 0.95, 1, 1] as const;
 
 for (let i = 0; i < initialVelocities.length; i += 4) {
   const theta = Math.random() * 2 * Math.PI;
   const phi = Math.acos(2 * Math.random() - 1);
-  const radius = Math.cbrt(Math.random()) * BOUNDS * 1.5;
+  const radius = Math.cbrt(Math.random()) * BOUNDS * 0.8;
 
   initialPositions[i + 0] = radius * Math.sin(phi) * Math.cos(theta);
   initialPositions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
@@ -86,13 +87,12 @@ mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
 
 export const viewMatrix = mat4.create();
 mat4.translate(viewMatrix, viewMatrix, [0, 0, -BOUNDS * 2]);
-mat4.rotateX(viewMatrix, viewMatrix, Math.PI / 6);
 
 export const renderUniforms = {
   projectionMatrix,
   viewMatrix,
   lightDirection: [0.5, 0.7, 0],
   lightColor: [1.5, 1.5, 1.5],
-  ambientColor: [0.2, 0.2, 0.2],
-  scale: 0.5,
+  ambientColor: canvasBackground.slice(0, 3).map((c) => c * 0.7),
+  scale: 0.8,
 };

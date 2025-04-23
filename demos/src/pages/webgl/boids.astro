@@ -6,15 +6,13 @@ import Layout from "../../layouts/Layout.astro";
   import { loadOBJ } from "../../models/objLoader";
   import {
     boidsUniforms,
+    canvasBackground,
     colors,
-    computeElement,
     computeTime,
     COUNT,
     initialPositions,
     initialVelocities,
-    jsElement,
     jsTime,
-    renderElement,
     renderTime,
     renderUniforms,
     speed,
@@ -23,8 +21,17 @@ import Layout from "../../layouts/Layout.astro";
   import fsSource from "../../webgl/boids/shaders/render.frag?raw";
   import { createStaticBuffer, initProgram } from "../../webgl/utils";
   import { useBoidsWebGL } from "../../webgl/boids/gpgpu";
+  import { createPane, type Params } from "../../commons/tweakpane";
 
-  document.getElementById("objects")!.innerText = COUNT.toString();
+  const params: Params = {
+    api: "WebGL",
+    objects: COUNT,
+    jsTime: "0ms",
+    renderTime: "0ms",
+    computeTime: "0ms",
+  };
+
+  createPane(params);
 
   async function main() {
     const canvas = document.querySelector("canvas")!;
@@ -84,7 +91,7 @@ import Layout from "../../layouts/Layout.astro";
     function drawScene(positionsTexture: WebGLTexture, velocitiesTexture: WebGLTexture) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-      gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl.clearColor(...canvasBackground);
       gl.clearDepth(1.0);
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
@@ -144,7 +151,7 @@ import Layout from "../../layouts/Layout.astro";
       endGPUTime();
 
       jsTime.addValue(performance.now() - lastTime);
-      jsElement.textContent = jsTime.getAverage().toFixed(1) + "ms";
+      params.jsTime = jsTime.getAverage().toFixed(1) + "ms";
 
       requestAnimationFrame(render);
     }
@@ -171,12 +178,12 @@ import Layout from "../../layouts/Layout.astro";
 
       if (measureTarget === "render") {
         renderTime.addValue(measuredTime / 1e6);
-        renderElement.textContent = renderTime.getAverage().toFixed(1) + "ms";
+        params.renderTime = renderTime.getAverage().toFixed(1) + "ms";
         measureTarget = "compute";
         gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
       } else {
         computeTime.addValue(measuredTime / 1e6);
-        computeElement.textContent = computeTime.getAverage().toFixed(1) + "ms";
+        params.computeTime = computeTime.getAverage().toFixed(1) + "ms";
         measureTarget = "render";
       }
     }

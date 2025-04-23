@@ -6,13 +6,12 @@ import Layout from "../../layouts/Layout.astro";
   import { loadOBJ } from "../../models/objLoader";
   import {
     boidsUniforms,
+    canvasBackground,
     colors,
     COUNT,
     initialPositions,
     initialVelocities,
-    jsElement,
     jsTime,
-    renderElement,
     renderTime,
     renderUniforms,
     speed,
@@ -20,8 +19,17 @@ import Layout from "../../layouts/Layout.astro";
   import { useBoidsGPU } from "../../webgpu/boids/gpgpu";
   import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "../../webgpu/utils";
   import shaderSource from "../../webgpu/boids/shaders/render.wgsl?raw";
+  import { createPane, type Params } from "../../commons/tweakpane";
 
-  document.getElementById("objects")!.innerText = COUNT.toString();
+  const params: Params = {
+    api: "WebGPU",
+    objects: COUNT,
+    jsTime: "0ms",
+    renderTime: "0ms",
+    computeTime: "0ms",
+  };
+
+  createPane(params);
 
   async function main() {
     if (!navigator.gpu) {
@@ -206,7 +214,7 @@ import Layout from "../../layouts/Layout.astro";
 
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
-    const computeBoids = useBoidsGPU(device, initialPositions, initialVelocities, colorsBuffer, COUNT);
+    const computeBoids = useBoidsGPU(device, initialPositions, initialVelocities, colorsBuffer, params);
 
     function drawScene(positionsBuffer: GPUBuffer, velocitiesBuffer: GPUBuffer) {
       const commandEncoder = device.createCommandEncoder({
@@ -217,7 +225,12 @@ import Layout from "../../layouts/Layout.astro";
         colorAttachments: [
           {
             view: context.getCurrentTexture().createView(),
-            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            clearValue: {
+              r: canvasBackground[0],
+              g: canvasBackground[1],
+              b: canvasBackground[2],
+              a: canvasBackground[3],
+            },
             loadOp: "clear",
             storeOp: "store",
           },
@@ -258,7 +271,7 @@ import Layout from "../../layouts/Layout.astro";
       readTimingBuffer(resultBuffer).then((measure) => {
         if (measure && measure > 0) {
           renderTime.addValue(measure);
-          renderElement.textContent = renderTime.getAverage().toFixed(1) + "ms";
+          params.renderTime = renderTime.getAverage().toFixed(1) + "ms";
         }
       });
     }
@@ -272,7 +285,7 @@ import Layout from "../../layouts/Layout.astro";
       drawScene(positionsBuffer, velocitiesBuffer);
 
       jsTime.addValue(performance.now() - currentTime);
-      jsElement.textContent = jsTime.getAverage().toFixed(1) + "ms";
+      params.jsTime = jsTime.getAverage().toFixed(1) + "ms";
 
       lastTime = currentTime;
       requestAnimationFrame(render);

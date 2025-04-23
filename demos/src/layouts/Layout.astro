@@ -39,7 +39,7 @@ const { api } = Astro.props;
   </body>
 </html>
 
-<style>
+<style is:global>
   body {
     margin: 0;
   }
@@ -74,6 +74,10 @@ const { api } = Astro.props;
     p:has(strong:empty) {
       display: none;
     }
+
+    &:has(#objects:empty) {
+      display: none;
+    }
   }
   p {
     margin: 0;
@@ -82,5 +86,68 @@ const { api } = Astro.props;
     width: 100svw;
     height: 100svh;
     display: block;
+  }
+
+  /* Tweakpane */
+  div.tp-dfwv {
+    --tp-container-unit-size: 1.5em;
+    --tp-blade-value-width: 12ch;
+    --tp-blade-horizontal-padding: 0.5em;
+
+    --tp-base-background-color: hsla(0, 0%, 100%, 1);
+    --tp-base-font-family: Arial, sans-serif;
+
+    --tp-base-shadow-color: hsla(0, 0%, 0%, 0.2);
+    --tp-button-background-color: hsla(0, 0%, 20%, 1);
+    --tp-button-background-color-active: hsla(0, 0%, 0%, 1);
+    --tp-button-background-color-focus: hsla(0, 0%, 5%, 1);
+    --tp-button-background-color-hover: hsla(0, 0%, 15%, 1);
+    --tp-button-foreground-color: hsla(0, 0%, 100%, 0.95);
+
+    --tp-container-background-color: hsl(210, 100%, 96%);
+    --tp-container-background-color-active: hsl(210, 70%, 80%);
+    --tp-container-background-color-focus: hsl(210, 100%, 94%);
+    --tp-container-background-color-hover: hsl(210, 80%, 85%);
+    --tp-container-foreground-color: hsla(0, 0%, 10%, 1);
+
+    --tp-container-horizontal-padding: 0.4em;
+    --tp-container-vertical-padding: 0.4em;
+
+    --tp-groove-foreground-color: hsla(0, 0%, 0%, 0.2);
+
+    --tp-input-background-color: hsla(0, 0%, 0%, 0.1);
+    --tp-input-background-color-active: hsla(0, 0%, 0%, 0.6);
+    --tp-input-background-color-focus: hsla(0, 0%, 0%, 0.1);
+    --tp-input-background-color-hover: hsla(0, 0%, 0%, 0.4);
+    --tp-input-foreground-color: hsla(0, 0%, 5%, 1);
+
+    --tp-label-foreground-color: hsla(0, 0%, 10%, 1);
+
+    --tp-monitor-background-color: hsla(0, 0%, 0%, 0);
+    --tp-monitor-foreground-color: hsla(0, 0%, 5%, 1);
+
+    font-size: 1.5rem;
+    width: 26ch;
+
+    .tp-rotv {
+      font-weight: bold;
+      font-size: inherit;
+      box-shadow: 0 0 30px -10px hsl(0 0 0% / 0.5);
+    }
+
+    .tp-lblv_l {
+      font-weight: normal;
+    }
+
+    .tp-fldv.tp-fldv-expanded > .tp-fldv_c {
+      padding-top: 0.125em;
+      padding-bottom: 0.125em;
+    }
+
+    .tp-lstv_m svg,
+    .tp-coltxtv_mm svg {
+      transform: scale(1.5); /* the svg doesn't have a viewbox so can't change its size */
+      transform-origin: right;
+    }
   }
 </style>
