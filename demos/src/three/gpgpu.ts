@@ -66,7 +66,9 @@ export function computeVelocities(
     const alignmentWeight = 1.0;
     const cohesionWeight = 1.0;
 
-    for (let j = skipFirst ? 1 : 0; j < numBoids; j++) {
+    const startIndex = skipFirst ? (i === 0 ? numBoids : 1) : 0;
+
+    for (let j = startIndex; j < numBoids; j++) {
       if (i === j) continue;
 
       const otherPosition: [number, number, number] = [positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]];
@@ -112,7 +114,7 @@ export function computeVelocities(
       acceleration = add(acceleration, scale(normalize(cohesionForce), cohesionWeight));
     }
 
-    // add a force towards the center of the scene that increases with the distance to origin
+    // Keep boids within bounds
     const distToCenter = length(selfPosition);
     acceleration = add(acceleration, scale(selfPosition, -distToCenter * 0.0003));
 

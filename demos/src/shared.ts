@@ -39,7 +39,7 @@ const red = [1, 0.7, 0.1, 1];
 const green = [0, 0.3, 1, 1];
 const cyan = [0, 0.7, 1, 1];
 
-export const canvasBackground = [0.85, 0.95, 1, 1] as const;
+export const canvasBackground = [0.8, 0.9, 1, 1] as const;
 
 for (let i = 0; i < initialVelocities.length; i += 4) {
   const theta = Math.random() * 2 * Math.PI;
