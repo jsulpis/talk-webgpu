@@ -48,12 +48,13 @@ void main() {
         vec3 otherVelocity = texture(velocities, otherUv).xyz;
         vec3 otherColor = texture(colors, otherUv).xyz;
 
-        bool sameColor = all(lessThan(abs(color - otherColor), vec3(0.01)));
-
         vec3 diff = position - otherPosition;
         float distance = length(diff);
 
-        if (sameColor) {
+        bool sameColor = all(lessThan(abs(color - otherColor), vec3(0.01)));
+        bool isInFieldOfView = dot(normalize(velocity), normalize(otherPosition - position)) > 0.;
+
+        if (sameColor && isInFieldOfView) {
           // Alignment - align with the direction of other boids
           if (distance < alignmentDistance) {
               alignment += otherVelocity;
@@ -89,23 +90,10 @@ void main() {
       acceleration += normalize(cohesionForce) * cohesionWeight;
    }
 
-  // Apply a force near the borders to keep boids within limits
-   if (position.x < -bounds + borderDistance) {
-      acceleration.x += borderForce;
-   } else if (position.x > bounds - borderDistance) {
-      acceleration.x -= borderForce;
-   }
-
-   if (position.y < -bounds + borderDistance) {
-      acceleration.y += borderForce;
-   } else if (position.y > bounds - borderDistance) {
-      acceleration.y -= borderForce;
-   }
-
-   if (position.z < -bounds + borderDistance) {
-      acceleration.z += borderForce;
-   } else if (position.z > bounds - borderDistance) {
-      acceleration.z -= borderForce;
+  // Keep boids within bounds
+   float distToCenter = length(position);
+   if (distToCenter > bounds) {
+      acceleration -= position * distToCenter * 0.00003;
    }
 
    velocity += acceleration * deltaTime;

@@ -29,7 +29,27 @@ import Layout from "../../layouts/Layout.astro";
     computeTime: "0ms",
   };
 
-  createPane(params);
+  const pane = createPane(params);
+
+  const boidsFolder = pane.addFolder({ title: "Boids" });
+  boidsFolder.addBinding(boidsUniforms, "separationDistance", {
+    label: "Separation",
+    min: 0,
+    max: 20,
+    step: 1,
+  });
+  boidsFolder.addBinding(boidsUniforms, "alignmentDistance", {
+    label: "Alignment",
+    min: 0,
+    max: 20,
+    step: 1,
+  });
+  boidsFolder.addBinding(boidsUniforms, "cohesionDistance", {
+    label: "Cohesion",
+    min: 0,
+    max: 20,
+    step: 1,
+  });
 
   async function main() {
     if (!navigator.gpu) {

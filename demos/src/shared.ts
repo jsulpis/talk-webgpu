@@ -69,10 +69,10 @@ for (let i = 0; i < initialVelocities.length; i += 4) {
 export const boidsUniforms = {
   deltaTime: 0,
   separationDistance: 8,
-  alignmentDistance: 6,
-  cohesionDistance: 8,
+  alignmentDistance: 9,
+  cohesionDistance: 12,
   borderForce: 0.3,
-  borderDistance: 50,
+  borderDistance: BOUNDS * 0.5,
   bounds: BOUNDS,
 };
 

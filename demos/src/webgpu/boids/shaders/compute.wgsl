@@ -50,12 +50,14 @@ fn computeBoids(@builtin(global_invocation_id) id: vec3u) {
     let otherVelocity = inputVelocities[i];
     let otherColor = colors[i];
 
-    let sameColor = all(abs(color - otherColor) < vec3f(0.01));
 
     let diff = position - otherPosition;
     let distance = length(diff);
 
-    if (sameColor) {
+    let sameColor = all(abs(color - otherColor) < vec3f(0.01));
+    let isInFieldOfView = dot(normalize(velocity), normalize(otherPosition - position)) > 0.;
+
+    if (sameColor && isInFieldOfView) {
       // Alignment - align with the direction of other boids
       if (distance < uniforms.alignmentDistance) {
         alignment += otherVelocity;
@@ -89,23 +91,10 @@ fn computeBoids(@builtin(global_invocation_id) id: vec3u) {
     acceleration += normalize(cohesionForce) * cohesionWeight;
   }
 
-  // Apply a force near the borders to keep boids within limits
-  if (position.x < -uniforms.bounds + uniforms.borderDistance) {
-    acceleration.x += uniforms.borderForce;
-  } else if (position.x > uniforms.bounds - uniforms.borderDistance) {
-    acceleration.x -= uniforms.borderForce;
-  }
-
-  if (position.y < -uniforms.bounds + uniforms.borderDistance) {
-    acceleration.y += uniforms.borderForce;
-  } else if (position.y > uniforms.bounds - uniforms.borderDistance) {
-    acceleration.y -= uniforms.borderForce;
-  }
-
-  if (position.z < -uniforms.bounds + uniforms.borderDistance) {
-    acceleration.z += uniforms.borderForce;
-  } else if (position.z > uniforms.bounds - uniforms.borderDistance) {
-    acceleration.z -= uniforms.borderForce;
+  // Keep boids within bounds
+  let distToCenter = length(position);
+  if (distToCenter > uniforms.bounds) {
+    acceleration -= position * distToCenter * 0.00003;
   }
 
   velocity += acceleration * uniforms.deltaTime;

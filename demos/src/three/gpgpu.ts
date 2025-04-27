@@ -1,6 +1,4 @@
-export const BOUNDS = 100;
-
-const SPEED_LIMIT = 9.0;
+const SPEED_LIMIT = 4.0;
 
 function normalize(vec: [number, number, number]): [number, number, number] {
   const length = Math.sqrt(vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]);
@@ -23,6 +21,10 @@ function scale(vec: [number, number, number], scalar: number): [number, number, 
   return [vec[0] * scalar, vec[1] * scalar, vec[2] * scalar];
 }
 
+function dot(vec1: [number, number, number], vec2: [number, number, number]): number {
+  return vec1[0] * vec2[0] + vec1[1] * vec2[1] + vec1[2] * vec2[2];
+}
+
 export function computePositions(
   input: Float32Array,
   output: Float32Array,
@@ -43,113 +45,85 @@ export function computeVelocities(
   deltaTime: number,
   separationDistance: number,
   alignmentDistance: number,
-  cohesionDistance: number,
-  time: number,
-  borderForce: number,
-  borderDistance: number
+  cohesionDistance: number
 ) {
-  const width = Math.sqrt(positions.length / 3);
-  const height = width;
+  const numBoids = input.length / 3;
 
-  const zoneRadius = separationDistance + alignmentDistance + cohesionDistance;
-  const separationThresh = separationDistance / zoneRadius;
-  const alignmentThresh = (separationDistance + alignmentDistance) / zoneRadius;
-  const zoneRadiusSquared = zoneRadius * zoneRadius;
-
-  for (let i = 0; i < input.length; i += 3) {
-    const selfPosition: [number, number, number] = [positions[i], positions[i + 1], positions[i + 2]];
-    const selfVelocity: [number, number, number] = [input[i], input[i + 1], input[i + 2]];
+  for (let i = 0; i < numBoids; i++) {
+    const selfPosition: [number, number, number] = [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]];
+    const selfVelocity: [number, number, number] = [input[i * 3], input[i * 3 + 1], input[i * 3 + 2]];
     let velocity: [number, number, number] = selfVelocity;
 
-    const central: [number, number, number] = [0, 0, 0];
-    let dir: [number, number, number] = subtract(selfPosition, central);
-    const distToCenter = length(dir);
-    dir[1] *= 2.5;
+    let alignment: [number, number, number] = [0, 0, 0];
+    let alignmentCount = 0;
+    let cohesionCount = 0;
 
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const ref = [(x + 0.5) / width, (y + 0.5) / height];
-        const birdPosition: [number, number, number] = [
-          positions[(y * width + x) * 3],
-          positions[(y * width + x) * 3 + 1],
-          positions[(y * width + x) * 3 + 2],
-        ];
+    let acceleration: [number, number, number] = [0, 0, 0];
+    let centerOfMass: [number, number, number] = [0, 0, 0];
 
-        dir = subtract(birdPosition, selfPosition);
-        const dist = length(dir);
+    const separationWeight = 1.5;
+    const alignmentWeight = 1.0;
+    const cohesionWeight = 1.0;
 
-        if (dist < 0.0001) continue;
+    for (let j = 0; j < numBoids; j++) {
+      if (i === j) continue;
 
-        const distSquared = dist * dist;
+      const otherPosition: [number, number, number] = [positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]];
+      const otherVelocity: [number, number, number] = [input[j * 3], input[j * 3 + 1], input[j * 3 + 2]];
 
-        if (distSquared > zoneRadiusSquared) continue;
+      const diff = subtract(selfPosition, otherPosition);
+      const distance = length(diff);
 
-        const percent = distSquared / zoneRadiusSquared;
+      const isInFieldOfView = dot(normalize(selfVelocity), normalize(subtract(otherPosition, selfPosition))) > 0.5;
 
-        if (percent < separationThresh) {
-          const f = (separationThresh / percent - 1.0) * deltaTime;
-          velocity = subtract(velocity, scale(normalize(dir), f));
-        } else if (percent < alignmentThresh) {
-          const threshDelta = alignmentThresh - separationThresh;
-          const adjustedPercent = (percent - separationThresh) / threshDelta;
-
-          const birdVelocity: [number, number, number] = [
-            input[(y * width + x) * 3],
-            input[(y * width + x) * 3 + 1],
-            input[(y * width + x) * 3 + 2],
-          ];
-
-          const f = (0.5 - Math.cos(adjustedPercent * 2 * Math.PI) * 0.5 + 0.5) * deltaTime;
-          velocity = add(velocity, scale(normalize(birdVelocity), f));
-        } else {
-          const threshDelta = 1.0 - alignmentThresh;
-          const adjustedPercent = threshDelta === 0 ? 1 : (percent - alignmentThresh) / threshDelta;
-
-          const f = (0.5 - (Math.cos(adjustedPercent * 2 * Math.PI) * -0.5 + 0.5)) * deltaTime;
-          velocity = add(velocity, scale(normalize(dir), f));
+      if (isInFieldOfView) {
+        // Alignment - align with the direction of other boids
+        if (distance < alignmentDistance) {
+          alignment = add(alignment, otherVelocity);
+          alignmentCount++;
         }
+
+        // Cohesion - move towards the center of nearby boids
+        if (distance < cohesionDistance) {
+          centerOfMass = add(centerOfMass, otherPosition);
+          cohesionCount++;
+        }
+      }
+
+      // Separation - avoid collisions with nearby boids
+      if (distance > 0 && distance < separationDistance) {
+        const repulsionForce = scale(normalize(diff), (separationDistance / distance - 1.0) * separationWeight);
+        acceleration = add(acceleration, repulsionForce);
       }
     }
 
-    const distToBorderX = BOUNDS - Math.abs(selfPosition[0]);
-    const distToBorderY = BOUNDS / 2 - Math.abs(selfPosition[1]);
-    const distToBorderZ = BOUNDS / 2 - Math.abs(selfPosition[2]);
-    let forceX = 0;
-    let forceY = 0;
-    let forceZ = 0;
-
-    if (distToBorderX < borderDistance) {
-      forceX = ((borderDistance - distToBorderX) / borderDistance) * -Math.sign(selfPosition[0]);
-    }
-    if (distToBorderY < borderDistance) {
-      forceY = ((borderDistance - distToBorderY) / borderDistance) * -Math.sign(selfPosition[1]);
-    }
-    if (distToBorderZ < borderDistance) {
-      forceZ = ((borderDistance - distToBorderZ) / borderDistance) * -Math.sign(selfPosition[2]);
+    // Alignment force
+    if (alignmentCount > 0) {
+      const averageVelocity = scale(alignment, 1 / alignmentCount);
+      const alignmentForce = subtract(averageVelocity, selfVelocity);
+      acceleration = add(acceleration, scale(alignmentForce, alignmentWeight));
     }
 
-    velocity = add(velocity, scale([forceX, forceY, forceZ], borderForce * deltaTime));
+    // Cohesion force
+    if (cohesionCount > 0) {
+      const averagePosition = scale(centerOfMass, 1 / cohesionCount);
+      const cohesionForce = subtract(averagePosition, selfPosition);
+      acceleration = add(acceleration, scale(normalize(cohesionForce), cohesionWeight));
+    }
 
-    if (length(velocity) > SPEED_LIMIT) {
+    // add a force towards the center of the scene that increases with the distance to origin
+    const distToCenter = length(selfPosition);
+    acceleration = add(acceleration, scale(selfPosition, -distToCenter * 0.0003));
+
+    velocity = add(velocity, scale(acceleration, deltaTime));
+
+    const speed = length(velocity);
+    if (speed > SPEED_LIMIT) {
       velocity = scale(normalize(velocity), SPEED_LIMIT);
     }
-    // const rotationAngle = 0.02 * Math.sin(time / 100 + (i / input.length) * 2 * Math.PI);
 
-    // const cosTheta = Math.cos(rotationAngle);
-    // const sinTheta = Math.sin(rotationAngle);
-    // const rotationMatrix = [
-    //   [cosTheta, 0, sinTheta],
-    //   [0, 1, 0],
-    //   [-sinTheta, 0, cosTheta],
-    // ];
-
-    // const rotatedVelocity = [
-    //   rotationMatrix[0][0] * velocity[0] + rotationMatrix[0][1] * velocity[1] + rotationMatrix[0][2] * velocity[2],
-    //   rotationMatrix[1][0] * velocity[0] + rotationMatrix[1][1] * velocity[1] + rotationMatrix[1][2] * velocity[2],
-    //   rotationMatrix[2][0] * velocity[0] + rotationMatrix[2][1] * velocity[1] + rotationMatrix[2][2] * velocity[2],
-    // ];
-    output[i] = velocity[0];
-    output[i + 1] = velocity[1];
-    output[i + 2] = velocity[2];
+    output[i * 3] = velocity[0];
+    output[i * 3 + 1] = velocity[1];
+    output[i * 3 + 2] = velocity[2];
   }
 }
