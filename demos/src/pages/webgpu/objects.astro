@@ -4,7 +4,16 @@ import Layout from "../../layouts/Layout.astro";
 
 <script>
   import { createSphereGeometry } from "../../models/sphere";
-  import { canvasBackground, colors, COUNT, initialPositions, jsTime, renderTime, renderUniforms } from "../../shared";
+  import {
+    canvasBackground,
+    colors,
+    COUNT,
+    initialPositions,
+    jsTime,
+    renderTime,
+    renderUniforms,
+    setAnimationLoop,
+  } from "../../shared";
   import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "../../webgpu/utils";
   import shaderSource from "../../webgpu/objects/render.wgsl?raw";
   import { createPane, type Params } from "../../commons/tweakpane";
@@ -306,18 +315,12 @@ import Layout from "../../layouts/Layout.astro";
       });
     }
 
-    function render() {
-      const currentTime = performance.now();
-
+    setAnimationLoop(function render({ startTime }) {
       drawScene();
 
+      jsTime.addValue(performance.now() - startTime);
       params.jsTime = jsTime.getAverage().toFixed(1) + "ms";
-      jsTime.addValue(performance.now() - currentTime);
-
-      requestAnimationFrame(render);
-    }
-
-    render();
+    });
   }
 
   window.onload = main;

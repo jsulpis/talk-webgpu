@@ -15,6 +15,7 @@ import Layout from "../../layouts/Layout.astro";
     jsTime,
     renderTime,
     renderUniforms,
+    setAnimationLoop,
     speed,
   } from "../../shared";
   import vsSource from "../../webgl/boids/shaders/render.vert?raw";
@@ -133,16 +134,12 @@ import Layout from "../../layouts/Layout.astro";
       gl.drawElementsInstanced(gl.TRIANGLES, geometry.indices.length, gl.UNSIGNED_SHORT, 0, COUNT);
     }
 
-    function render() {
+    setAnimationLoop(function render({ deltaTime, startTime }) {
       if (!isGPUTimeAvailable()) {
         // still computing the previous frame, skip this frame
-        requestAnimationFrame(render);
         return;
       }
-
-      const currentTime = performance.now();
-      boidsUniforms.deltaTime = (currentTime - lastTime) * speed;
-      lastTime = currentTime;
+      boidsUniforms.deltaTime = deltaTime * speed;
 
       getGPUTime();
       const { positionsTexture, velocitiesTexture } = computeBoids(boidsUniforms);
@@ -150,13 +147,9 @@ import Layout from "../../layouts/Layout.astro";
       drawScene(positionsTexture, velocitiesTexture);
       endGPUTime();
 
-      jsTime.addValue(performance.now() - lastTime);
+      jsTime.addValue(performance.now() - startTime);
       params.jsTime = jsTime.getAverage().toFixed(1) + "ms";
-
-      requestAnimationFrame(render);
-    }
-
-    render();
+    });
   }
 
   window.onload = main;

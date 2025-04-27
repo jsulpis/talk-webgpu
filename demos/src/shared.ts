@@ -96,3 +96,36 @@ export const renderUniforms = {
   ambientColor: canvasBackground.slice(0, 3).map((c) => c * 0.7),
   scale: 0.8,
 };
+
+/**
+ * Sets up an animation loop that calls the provided `loop` function on each frame
+ * and pauses when the tab is not active
+ */
+export function setAnimationLoop(loop: (params: { deltaTime: number; startTime: number }) => void) {
+  let rafId = 0;
+  let lastTime = 0;
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      cancelAnimationFrame(rafId);
+    } else {
+      lastTime = performance.now();
+      rafId = requestAnimationFrame(animate);
+    }
+  });
+
+  function animate() {
+    const startTime = performance.now();
+    const deltaTime = startTime - lastTime;
+
+    loop({ deltaTime, startTime });
+
+    lastTime = startTime;
+
+    if (!document.hidden) {
+      rafId = requestAnimationFrame(animate);
+    }
+  }
+
+  requestAnimationFrame(animate);
+}

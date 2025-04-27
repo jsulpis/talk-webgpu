@@ -3,7 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 ---
 
 <script>
-  import { colors, COUNT, initialPositions, jsTime, renderTime, renderUniforms, canvasBackground } from "../../shared";
+  import { colors, COUNT, initialPositions, jsTime, renderTime, renderUniforms, canvasBackground, setAnimationLoop } from "../../shared";
   import vsSource from "../../webgl/objects/render.vert?raw";
   import fsSource from "../../webgl/objects/render.frag?raw";
   import { createStaticBuffer, initProgram } from "../../webgl/utils";
@@ -109,26 +109,18 @@ import Layout from "../../layouts/Layout.astro";
       }
     }
 
-    function render() {
+    setAnimationLoop(function render({ startTime }) {
       if (!isGPUTimeAvailable()) {
         // still computing the previous frame, skip this frame
-        requestAnimationFrame(render);
         return;
       }
-
-      const currentTime = performance.now();
-
       getGPUTime();
       drawScene();
       endGPUTime();
 
-      jsTime.addValue(performance.now() - currentTime);
+      jsTime.addValue(performance.now() - startTime);
       params.jsTime = jsTime.getAverage().toFixed(1) + "ms";
-
-      requestAnimationFrame(render);
-    }
-
-    render();
+    });
   }
 
   window.onload = main;

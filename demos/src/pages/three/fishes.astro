@@ -8,7 +8,7 @@ import Layout from "../../layouts/Layout.astro";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
   import { clone } from "three/addons/utils/SkeletonUtils.js";
   import { computePositions, computeVelocities } from "../../three/gpgpu";
-  import { canvasBackground } from "../../shared";
+  import { canvasBackground, setAnimationLoop } from "../../shared";
 
   const BOUNDS = 30;
   const speed = 0.008;
@@ -119,7 +119,6 @@ import Layout from "../../layouts/Layout.astro";
   const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector("canvas")!, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setAnimationLoop(animate);
 
   // for consistency with the other demos + make colors more flashy
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
@@ -159,7 +158,6 @@ import Layout from "../../layouts/Layout.astro";
         return;
       }
 
-
       loader.load(otherfishUrl, function (gltf) {
         const model = gltf.scene;
         model.traverse(fixMaterial);
@@ -194,12 +192,9 @@ import Layout from "../../layouts/Layout.astro";
   const renderElement = document.getElementById("render")!;
   const computeElement = document.getElementById("compute")!;
 
-  const clock = new THREE.Clock();
-
-  function animate() {
+  setAnimationLoop(function render({ deltaTime }) {
     controls.update();
-    const delta = clock.getDelta();
-    const deltaTime = delta * 1000 * speed;
+    const ajustedDeltaTime = deltaTime * speed;
 
     performance.mark("compute");
 
@@ -207,7 +202,7 @@ import Layout from "../../layouts/Layout.astro";
       velocityBuffers.read,
       velocityBuffers.write,
       positionsBuffers.read,
-      deltaTime,
+      ajustedDeltaTime,
       boidsUniforms.separationDistance,
       boidsUniforms.alignmentDistance,
       boidsUniforms.cohesionDistance,
@@ -215,7 +210,7 @@ import Layout from "../../layouts/Layout.astro";
     );
     swapVelocityBuffers();
 
-    computePositions(positionsBuffers.read, positionsBuffers.write, velocityBuffers.read, deltaTime);
+    computePositions(positionsBuffers.read, positionsBuffers.write, velocityBuffers.read, ajustedDeltaTime);
     swapPositionsBuffers();
 
     const compute = performance.measure("compute", "compute");
@@ -223,13 +218,13 @@ import Layout from "../../layouts/Layout.astro";
 
     moveModels(positionsBuffers.read, velocityBuffers.read);
 
-    mixer?.update(delta);
+    mixer?.update(deltaTime / 1000);
 
     performance.mark("render");
     renderer.render(scene, camera);
     const render = performance.measure("render", "render");
     renderElement.textContent = render.duration.toFixed(2) + "ms";
-  }
+  });
 </script>
 
 <Layout />

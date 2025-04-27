@@ -14,6 +14,7 @@ import Layout from "../../layouts/Layout.astro";
     jsTime,
     renderTime,
     renderUniforms,
+    setAnimationLoop,
     speed,
   } from "../../shared";
   import { useBoidsGPU } from "../../webgpu/boids/gpgpu";
@@ -296,22 +297,17 @@ import Layout from "../../layouts/Layout.astro";
       });
     }
 
-    function render() {
-      const currentTime = performance.now();
-      boidsUniforms.deltaTime = (currentTime - lastTime) * speed;
+    setAnimationLoop(function render({ deltaTime, startTime }) {
+      boidsUniforms.deltaTime = deltaTime * speed;
+      console.log(boidsUniforms.deltaTime);
 
       const { positionsBuffer, velocitiesBuffer } = computeBoids(boidsUniforms);
 
       drawScene(positionsBuffer, velocitiesBuffer);
 
-      jsTime.addValue(performance.now() - currentTime);
+      jsTime.addValue(performance.now() - startTime);
       params.jsTime = jsTime.getAverage().toFixed(1) + "ms";
-
-      lastTime = currentTime;
-      requestAnimationFrame(render);
-    }
-
-    render();
+    });
   }
 
   window.onload = main;
