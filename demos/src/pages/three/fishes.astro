@@ -26,9 +26,10 @@ import Layout from "../../layouts/Layout.astro";
   const mainFishUrl = "/clownfish.glb";
   const otherfishUrl = "/blueTang.glb";
 
-  const COUNT = 10;
+  const searchParams = new URL(window.location.href).searchParams;
 
-  document.getElementById("objects")!.innerText = COUNT.toString();
+  const COUNT = Number(searchParams.get("count") ?? 10);
+  const isolateFirst = searchParams.get("isolateFirst") === "true";
 
   const models: THREE.Object3D[] = [];
 
@@ -120,14 +121,18 @@ import Layout from "../../layouts/Layout.astro";
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setAnimationLoop(animate);
 
+  // for consistency with the other demos + make colors more flashy
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  renderer.toneMapping = THREE.NoToneMapping;
+
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 3);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 10);
   scene.add(ambientLight);
 
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 8);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 10);
   directionalLight.position.set(1, 1, 1).normalize();
   scene.add(directionalLight);
 
@@ -149,6 +154,12 @@ import Layout from "../../layouts/Layout.astro";
       let action = mixer.clipAction(gltf.animations.find((clip) => clip.name.includes("Swimming_Fast"))!);
       action.play();
 
+      if (COUNT === 1) {
+        model.scale.set(1.5, 1.5, 1.5);
+        return;
+      }
+
+
       loader.load(otherfishUrl, function (gltf) {
         const model = gltf.scene;
         model.traverse(fixMaterial);
@@ -165,15 +176,8 @@ import Layout from "../../layouts/Layout.astro";
   function fixMaterial(child: THREE.Object3D<THREE.Object3DEventMap>) {
     if (child instanceof THREE.Mesh) {
       const mat = child.material as THREE.MeshStandardMaterial;
-
       mat.opacity = 1;
       mat.roughness = child.material.name.includes("Eyes") ? 0.1 : 0.7;
-
-      // increase saturation
-      // @ts-ignore
-      const hsl: THREE.HSL = {};
-      mat.color.getHSL(hsl);
-      mat.color.setHSL(hsl.h, Math.min(hsl.s * 2, 1.0), hsl.l);
     }
   }
 
@@ -207,7 +211,7 @@ import Layout from "../../layouts/Layout.astro";
       boidsUniforms.separationDistance,
       boidsUniforms.alignmentDistance,
       boidsUniforms.cohesionDistance,
-      true
+      isolateFirst
     );
     swapVelocityBuffers();
 
@@ -228,4 +232,4 @@ import Layout from "../../layouts/Layout.astro";
   }
 </script>
 
-<Layout api="WebGL" />
+<Layout />
