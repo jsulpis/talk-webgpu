@@ -45,7 +45,8 @@ export function computeVelocities(
   deltaTime: number,
   separationDistance: number,
   alignmentDistance: number,
-  cohesionDistance: number
+  cohesionDistance: number,
+  skipFirst = false
 ) {
   const numBoids = input.length / 3;
 
@@ -65,7 +66,7 @@ export function computeVelocities(
     const alignmentWeight = 1.0;
     const cohesionWeight = 1.0;
 
-    for (let j = 0; j < numBoids; j++) {
+    for (let j = skipFirst ? 1 : 0; j < numBoids; j++) {
       if (i === j) continue;
 
       const otherPosition: [number, number, number] = [positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]];
@@ -76,7 +77,7 @@ export function computeVelocities(
 
       const isInFieldOfView = dot(normalize(selfVelocity), normalize(subtract(otherPosition, selfPosition))) > 0.5;
 
-      if (isInFieldOfView) {
+      if (isInFieldOfView && (!skipFirst || i > 0)) {
         // Alignment - align with the direction of other boids
         if (distance < alignmentDistance) {
           alignment = add(alignment, otherVelocity);
