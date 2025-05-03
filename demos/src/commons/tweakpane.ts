@@ -1,4 +1,5 @@
 import { Pane } from "tweakpane";
+import type { PaneConfig } from "tweakpane/dist/types/pane/pane-config";
 
 export interface Params {
   api: "WebGL" | "WebGPU";
@@ -9,8 +10,8 @@ export interface Params {
   computeTime?: string;
 }
 
-export function createPane(params: Params) {
-  const pane = new Pane();
+export function createPane(params: Params, config?: PaneConfig) {
+  const pane = new Pane(config);
 
   pane.addBinding(params, "api", {
     readonly: true,

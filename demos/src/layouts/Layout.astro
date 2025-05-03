@@ -96,7 +96,7 @@ const { api = "WebGL" } = Astro.props;
     --tp-monitor-background-color: hsla(0, 0%, 0%, 0);
     --tp-monitor-foreground-color: hsla(0, 0%, 5%, 1);
 
-    width: 26ch;
+    width: calc(var(--tp-blade-value-width) + 16ch);
 
     .tp-rotv {
       font-weight: bold;
@@ -106,6 +106,10 @@ const { api = "WebGL" } = Astro.props;
 
     .tp-lblv_l {
       font-weight: normal;
+    }
+
+    .tp-txtv_k {
+      display: none;
     }
 
     .tp-fldv.tp-fldv-expanded > .tp-fldv_c {

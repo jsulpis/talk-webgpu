@@ -299,7 +299,6 @@ import Layout from "../../layouts/Layout.astro";
 
     setAnimationLoop(function render({ deltaTime, startTime }) {
       boidsUniforms.deltaTime = deltaTime * speed;
-      console.log(boidsUniforms.deltaTime);
 
       const { positionsBuffer, velocitiesBuffer } = computeBoids(boidsUniforms);
 

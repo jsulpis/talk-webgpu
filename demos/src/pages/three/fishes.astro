@@ -8,7 +8,9 @@ import Layout from "../../layouts/Layout.astro";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
   import { clone } from "three/addons/utils/SkeletonUtils.js";
   import { computePositions, computeVelocities } from "../../three/gpgpu";
-  import { canvasBackground, setAnimationLoop } from "../../shared";
+  import { canvasBackground, computeTime, renderTime, setAnimationLoop } from "../../shared";
+  import { type Params } from "../../commons/tweakpane";
+  import { Pane } from "tweakpane";
 
   const BOUNDS = 30;
   const speed = 0.008;
@@ -28,26 +30,56 @@ import Layout from "../../layouts/Layout.astro";
 
   const searchParams = new URL(window.location.href).searchParams;
 
-  const COUNT = Number(searchParams.get("count") ?? 10);
+  const params: Params = {
+    api: "WebGL",
+    jsTime: "0ms",
+    renderTime: "0ms",
+    computeTime: "0ms",
+    objects: Number(searchParams.get("count") ?? 10),
+  };
+
   const isolateFirst = searchParams.get("isolateFirst") === "true";
 
   const models: THREE.Object3D[] = [];
+  const MAX_COUNT = 1000;
+  const isFinalScreen = params.objects > 1 && !isolateFirst;
+
+  if (isFinalScreen) {
+    const pane = new Pane();
+
+    pane.addBinding(params, "objects", {
+      label: "objets",
+      min: 1,
+      max: MAX_COUNT,
+      step: 1,
+    });
+    pane.addBinding(params, "computeTime", {
+      label: "calcul",
+      readonly: true,
+    });
+  }
 
   /******************************************************************* */
   /***************************** GPGPU *********************************/
   /******************************************************************* */
 
-  let positionsBufferA = new Float32Array(COUNT * 3);
+  let positionsBufferA = new Float32Array(MAX_COUNT * 3);
   positionsBufferA[0] = 0;
   positionsBufferA[1] = 0;
   positionsBufferA[2] = BOUNDS / 2;
 
   for (let i = 3; i < positionsBufferA.length; i += 3) {
-    positionsBufferA[i + 0] = BOUNDS * 3;
-    positionsBufferA[i + 1] = BOUNDS * 3;
-    positionsBufferA[i + 2] = BOUNDS * 3;
+    if (isFinalScreen) {
+      positionsBufferA[i + 0] = (-Math.random() * 0.25 + 0.75) * BOUNDS * 2 - BOUNDS;
+      positionsBufferA[i + 1] = (-Math.random() * 0.25 + 0.75) * BOUNDS * 2 - BOUNDS;
+      positionsBufferA[i + 2] = (-Math.random() * 0.25 + 0.75) * BOUNDS * 2 - BOUNDS;
+    } else {
+      positionsBufferA[i + 0] = BOUNDS * 3;
+      positionsBufferA[i + 1] = BOUNDS * 3;
+      positionsBufferA[i + 2] = BOUNDS * 3;
+    }
   }
-  let positionsBufferB = new Float32Array(COUNT * 3);
+  let positionsBufferB = new Float32Array(MAX_COUNT * 3);
 
   const positionsBuffers = {
     read: positionsBufferA,
@@ -60,16 +92,22 @@ import Layout from "../../layouts/Layout.astro";
     positionsBuffers.write = temp;
   }
 
-  let velocityBufferA = new Float32Array(COUNT * 3);
+  let velocityBufferA = new Float32Array(MAX_COUNT * 3);
   velocityBufferA[0] = 2;
   velocityBufferA[1] = 1;
   velocityBufferA[2] = 0;
   for (let i = 3; i < velocityBufferA.length; i += 3) {
-    velocityBufferA[i + 0] = Math.random();
-    velocityBufferA[i + 1] = Math.random();
-    velocityBufferA[i + 2] = Math.random();
+    if (isFinalScreen) {
+      velocityBufferA[i + 0] = 0.5;
+      velocityBufferA[i + 1] = 0.5;
+      velocityBufferA[i + 2] = 0.5;
+    } else {
+      velocityBufferA[i + 0] = Math.random();
+      velocityBufferA[i + 1] = Math.random();
+      velocityBufferA[i + 2] = Math.random();
+    }
   }
-  let velocityBufferB = new Float32Array(COUNT * 3);
+  let velocityBufferB = new Float32Array(MAX_COUNT * 3);
 
   const velocityBuffers = {
     read: velocityBufferA,
@@ -84,6 +122,11 @@ import Layout from "../../layouts/Layout.astro";
 
   function moveModels(positions: Float32Array, velocities: Float32Array) {
     models.forEach((model, i) => {
+      model.visible = i < params.objects;
+      if (!model.visible) {
+        return;
+      }
+
       model.position.x = positions[i * 3 + 0];
       model.position.y = positions[i * 3 + 1];
       model.position.z = positions[i * 3 + 2];
@@ -153,7 +196,7 @@ import Layout from "../../layouts/Layout.astro";
       let action = mixer.clipAction(gltf.animations.find((clip) => clip.name.includes("Swimming_Fast"))!);
       action.play();
 
-      if (COUNT === 1) {
+      if (params.objects === 1) {
         model.scale.set(1.5, 1.5, 1.5);
         return;
       }
@@ -162,7 +205,7 @@ import Layout from "../../layouts/Layout.astro";
         const model = gltf.scene;
         model.traverse(fixMaterial);
 
-        for (let i = 1; i < COUNT; i++) {
+        for (let i = 1; i < MAX_COUNT; i++) {
           const clonedModel = clone(model);
           models.push(clonedModel);
           scene.add(clonedModel);
@@ -189,9 +232,6 @@ import Layout from "../../layouts/Layout.astro";
   /***************************** ANIMATE *********************************/
   /********************************************************************* */
 
-  const renderElement = document.getElementById("render")!;
-  const computeElement = document.getElementById("compute")!;
-
   setAnimationLoop(function render({ deltaTime }) {
     controls.update();
     const ajustedDeltaTime = deltaTime * speed;
@@ -206,15 +246,22 @@ import Layout from "../../layouts/Layout.astro";
       boidsUniforms.separationDistance,
       boidsUniforms.alignmentDistance,
       boidsUniforms.cohesionDistance,
-      isolateFirst
+      isolateFirst,
+      params.objects
     );
     swapVelocityBuffers();
 
-    computePositions(positionsBuffers.read, positionsBuffers.write, velocityBuffers.read, ajustedDeltaTime);
+    computePositions(
+      positionsBuffers.read,
+      positionsBuffers.write,
+      velocityBuffers.read,
+      ajustedDeltaTime,
+      params.objects
+    );
     swapPositionsBuffers();
 
     const compute = performance.measure("compute", "compute");
-    computeElement.textContent = compute.duration.toFixed(2) + "ms";
+    params.computeTime = compute.duration.toFixed(2) + "ms";
 
     moveModels(positionsBuffers.read, velocityBuffers.read);
 
@@ -223,8 +270,15 @@ import Layout from "../../layouts/Layout.astro";
     performance.mark("render");
     renderer.render(scene, camera);
     const render = performance.measure("render", "render");
-    renderElement.textContent = render.duration.toFixed(2) + "ms";
+    renderTime.addValue(render.duration);
+    params.renderTime = renderTime.getAverage().toFixed(2) + "ms";
   });
 </script>
 
 <Layout />
+
+<style is:global>
+  div.tp-dfwv {
+    --tp-blade-value-width: 18ch;
+  }
+</style>

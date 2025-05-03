@@ -29,12 +29,15 @@ export function computePositions(
   input: Float32Array,
   output: Float32Array,
   velocities: Float32Array,
-  deltaTime: number
+  deltaTime: number,
+  count?: number
 ) {
-  for (let i = 0; i < input.length; i += 3) {
-    output[i + 0] = input[i + 0] + velocities[i + 0] * deltaTime;
-    output[i + 1] = input[i + 1] + velocities[i + 1] * deltaTime;
-    output[i + 2] = input[i + 2] + velocities[i + 2] * deltaTime;
+  const numBoids = count ?? input.length / 3;
+
+  for (let i = 0; i < numBoids; i++) {
+    output[i * 3] = input[i * 3] + velocities[i * 3] * deltaTime;
+    output[i * 3 + 1] = input[i * 3 + 1] + velocities[i * 3 + 1] * deltaTime;
+    output[i * 3 + 2] = input[i * 3 + 2] + velocities[i * 3 + 2] * deltaTime;
   }
 }
 
@@ -46,9 +49,10 @@ export function computeVelocities(
   separationDistance: number,
   alignmentDistance: number,
   cohesionDistance: number,
-  skipFirst = false
+  skipFirst = false,
+  count?: number
 ) {
-  const numBoids = input.length / 3;
+  const numBoids = count ?? input.length / 3;
 
   for (let i = 0; i < numBoids; i++) {
     const selfPosition: [number, number, number] = [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]];
