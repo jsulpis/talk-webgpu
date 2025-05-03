@@ -11,7 +11,7 @@ defineProps<{
       <iframe :src="`${$slidev.configs.demosBaseUrl}${path}`"></iframe>
     </RenderWhen>
     <template #fallback>
-      <h1 class="fallback">{{ fallbackTitle }}</h1>
+      <h1 class="fallback">Démo : {{ fallbackTitle }}</h1>
     </template>
   </RenderWhen>
 </template>
@@ -30,6 +30,7 @@ defineProps<{
   & > h1 {
     font-size: 4rem;
     place-self: center;
+    text-align: center;
   }
 }
 </style>

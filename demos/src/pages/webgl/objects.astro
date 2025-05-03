@@ -3,21 +3,53 @@ import Layout from "../../layouts/Layout.astro";
 ---
 
 <script>
-  import { colors, COUNT, initialPositions, jsTime, renderTime, renderUniforms, canvasBackground, setAnimationLoop } from "../../shared";
+  import { jsTime, renderTime, renderUniforms, canvasBackground, setAnimationLoop } from "../../shared";
   import vsSource from "../../webgl/objects/render.vert?raw";
   import fsSource from "../../webgl/objects/render.frag?raw";
   import { createStaticBuffer, initProgram } from "../../webgl/utils";
   import { createSphereGeometry } from "../../models/sphere";
-  import { createPane, type Params } from "../../commons/tweakpane";
+  import { Pane } from "tweakpane";
+  import { generateColors, generateInitialPositions } from "../../shared/data";
 
-  const params: Params = {
+  const MAX_COUNT = 15_000;
+  const BOUNDS = 200;
+
+  const initialPositions = generateInitialPositions(MAX_COUNT, BOUNDS);
+  const colors = generateColors(MAX_COUNT);
+
+  const params = {
     api: "WebGL",
-    objects: COUNT,
+    objects: 10,
     jsTime: "0ms",
     renderTime: "0ms",
   };
 
-  createPane(params);
+  const pane = new Pane();
+
+  pane.addBinding(params, "api", {
+    readonly: true,
+    label: "api",
+  });
+
+  pane.addBinding(params, "objects", {
+    label: "objects",
+    min: 1,
+    max: MAX_COUNT,
+    step: 1,
+  });
+
+  const gpuFolder = pane.addFolder({ title: "GPU" });
+
+  gpuFolder.addBinding(params, "renderTime", {
+    label: "render",
+    readonly: true,
+  });
+
+  const cpuFolder = pane.addFolder({ title: "CPU" });
+  cpuFolder.addBinding(params, "jsTime", {
+    label: "JS Time",
+    readonly: true,
+  });
 
   async function main() {
     const canvas = document.querySelector("canvas")!;
@@ -60,7 +92,7 @@ import Layout from "../../layouts/Layout.astro";
     const normalBuffer = createStaticBuffer(gl, geometry.normals);
     const indexBuffer = createStaticBuffer(gl, geometry.indices, gl.ELEMENT_ARRAY_BUFFER);
 
-    const objectsData = Array.from({ length: COUNT }).map((_, i) => ({
+    const objectsData = Array.from({ length: MAX_COUNT }).map((_, i) => ({
       position: initialPositions.slice(i * 4, i * 4 + 4),
       color: colors.slice(i * 4, i * 4 + 4),
       scale: Math.random() * 0.5 + 1,
@@ -84,7 +116,9 @@ import Layout from "../../layouts/Layout.astro";
       gl.cullFace(gl.BACK);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-      for (let objectData of objectsData) {
+      for (let i = 0; i < params.objects; i++) {
+        const objectData = objectsData[i];
+
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
@@ -156,3 +190,13 @@ import Layout from "../../layouts/Layout.astro";
 </script>
 
 <Layout api="WebGL" />
+
+<style is:global>
+  div.tp-dfwv {
+    --tp-blade-value-width: 20ch;
+
+    .tp-txtv_i {
+      padding: 6px;
+    }
+  }
+</style>
