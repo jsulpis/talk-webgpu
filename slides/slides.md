@@ -312,16 +312,103 @@ layout: none
 <DemoIframe path="/three/fishes?count=10&isolateFirst=true" fallbackTitle="Poisson isolé du groupe" />
 
 ---
+layout: default
+---
+
+# Render Pipeline
+
+<img class="-mt-20 -z-1 scale-110 relative" src="/render-pipeline.png" alt="Render pipeline" />
+
+---
+layout: default
+---
+
+# WebGL
+
+<em>main.js</em>
+
+```js
+gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+gl.clearColor(1, 1, 1, 1);
+gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+...
+gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+gl.vertexAttribPointer(vertexPosition, 3, gl.FLOAT, false, 0, 0);
+gl.enableVertexAttribArray(vertexPosition);
+...
+gl.useProgram(program);
+gl.uniformMatrix4fv(projectionMatrix, false, uniforms.projectionMatrix);
+gl.uniformMatrix4fv(viewMatrix, false, uniforms.viewMatrix);
+gl.uniform3fv(lightDirection, uniforms.lightDirection);
+gl.uniform3fv(lightColor, uniforms.lightColor);
+...
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+```
+
+<style>
+  .shiki {
+    --slidev-code-font-size: 0.85rem;
+  }
+</style>
+
+---
+layout: default
+---
+
+# WebGL
+
+<em>main.js</em>
+
+````md magic-move
+```js
+function draw(model) {
+  ...
+  gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+}
+```
+```js
+function draw(model) {
+  ...
+  gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+}
+
+function loop() {
+  ...
+  draw(model1);
+  draw(model2);
+  ...
+}
+```
+````
+
+<style>
+  .shiki {
+    --slidev-code-font-size: 0.85rem;
+  }
+</style>
+
+
+---
+layout: default
+---
+
+# WebGL 
+
+<img class="mt-5" src="/webgl-cpu-overhead.png" alt="WebGL CPU Overhead" />
+
+---
+layout: none
+---
+
+<DemoIframe path="/webgl/objects" fallbackTitle="WebGL objets" />
+
+---
 layout: none
 ---
 
 <DemoIframe path="/three/fishes?count=10&isolateFirst=false" fallbackTitle="Poisson dans le groupe" />
-
----
-layout: none
----
-
-<DemoIframe path="/webgl/objects" fallbackTitle="Démo WebGL objets" />
 
 ---
 layout: none
