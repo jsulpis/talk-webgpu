@@ -1,0 +1,33 @@
+:root {
+  --slidev-code-padding: 1rem;
+  --slidev-code-font-size: 1rem;
+}
+
+.slidev-layout {
+  p {
+    margin: 0 !important;
+  }
+
+}
+
+.stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+
+  img {
+    max-height: 100%;
+    max-width: 100%;
+  }
+
+  img:not(:first-child) {
+    position: absolute;
+    object-fit: contain;
+  }
+}
+
+h1 {
+  font-weight: bold;
+}
