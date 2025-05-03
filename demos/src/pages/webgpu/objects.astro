@@ -4,19 +4,17 @@ import Layout from "../../layouts/Layout.astro";
 
 <script>
   import { createSphereGeometry } from "../../models/sphere";
-  import {
-    canvasBackground,
-    colors,
-    COUNT,
-    initialPositions,
-    jsTime,
-    renderTime,
-    renderUniforms,
-    setAnimationLoop,
-  } from "../../shared";
+  import { canvasBackground, jsTime, renderTime, renderUniforms, setAnimationLoop, BOUNDS } from "../../shared";
   import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "../../webgpu/utils";
   import shaderSource from "../../webgpu/objects/render.wgsl?raw";
   import { createPane, type Params } from "../../commons/tweakpane";
+  import { generateInitialPositions, generateColors, generateScales } from "../../shared/data";
+
+  const COUNT = 15_000;
+
+  const positions = generateInitialPositions(COUNT, BOUNDS);
+  const colors = generateColors(COUNT);
+  const scales = generateScales(COUNT);
 
   const params: Params = {
     api: "WebGPU",
@@ -33,6 +31,7 @@ import Layout from "../../layouts/Layout.astro";
     view: "list",
     options: [
       { text: "naive", value: "naive" },
+      { text: "instanced", value: "instanced" },
       { text: "render bundle", value: "renderBundle" },
     ],
   });
@@ -209,9 +208,9 @@ import Layout from "../../layouts/Layout.astro";
     let modelUniform;
     for (let i = 0; i < COUNT; i++) {
       modelUniform = {
-        position: initialPositions.slice(i * 4, i * 4 + 4),
+        position: positions.slice(i * 4, i * 4 + 4),
         color: colors.slice(i * 4, i * 4 + 4),
-        scale: Math.random() * 0.5 + 1,
+        scale: scales[i],
       };
       modelUniformsData.set(modelUniform.position, 0);
       modelUniformsData.set(modelUniform.color, 4);
@@ -237,11 +236,6 @@ import Layout from "../../layouts/Layout.astro";
         position: modelUniform.position,
       });
     }
-
-    // Sort the objects so that the closest ones are drawn first to improve overdraw
-    objectsData.sort((a, b) => {
-      return b.position[2] - a.position[2];
-    });
 
     const bundleEncoder = device.createRenderBundleEncoder({
       colorFormats: [format],
@@ -288,9 +282,7 @@ import Layout from "../../layouts/Layout.astro";
         timestampWrites,
       });
 
-      if (params.method === "renderBundle") {
-        renderPass.executeBundles([renderBundle]);
-      } else {
+      if (params.method === "naive") {
         for (let objectData of objectsData) {
           renderPass.setPipeline(pipeline);
           renderPass.setVertexBuffer(0, positionBuffer);
@@ -300,6 +292,10 @@ import Layout from "../../layouts/Layout.astro";
           renderPass.setBindGroup(0, objectData.bindGroup);
           renderPass.drawIndexed(geometry.indices.length);
         }
+      } else {
+        // use the render bundle even when the parameter is "instanced" for simplicity
+        // but the performance is roughly the same
+        renderPass.executeBundles([renderBundle]);
       }
 
       renderPass.end();
@@ -330,6 +326,10 @@ import Layout from "../../layouts/Layout.astro";
 
 <style is:global>
   div.tp-dfwv {
-    --tp-blade-value-width: 16ch;
+    --tp-blade-value-width: 20ch;
+
+    .tp-txtv_i {
+      padding: 6px;
+    }
   }
 </style>

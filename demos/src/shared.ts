@@ -19,8 +19,7 @@ export class MovingAverage {
   }
 }
 
-export const COUNT = 10000;
-export const BOUNDS = 100;
+export const BOUNDS = 200;
 
 export const renderElement = document.getElementById("render")!;
 export const computeElement = document.getElementById("compute")!;
@@ -31,40 +30,7 @@ export const jsTime = new MovingAverage(10);
 
 export const speed = 0.015;
 
-export let initialPositions = new Float32Array(COUNT * 4);
-export let initialVelocities = new Float32Array(COUNT * 4);
-export let colors = new Float32Array(COUNT * 4);
-
-const red = [1, 0.7, 0.1, 1];
-const green = [0, 0.3, 1, 1];
-const cyan = [0, 0.7, 1, 1];
-
 export const canvasBackground = [0.8, 0.9, 1, 1] as const;
-
-for (let i = 0; i < initialVelocities.length; i += 4) {
-  const theta = Math.random() * 2 * Math.PI;
-  const phi = Math.acos(2 * Math.random() - 1);
-  const radius = Math.cbrt(Math.random()) * BOUNDS * 0.8;
-
-  initialPositions[i + 0] = radius * Math.sin(phi) * Math.cos(theta);
-  initialPositions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
-  initialPositions[i + 2] = radius * Math.cos(phi);
-  initialPositions[i + 3] = 0; // data alignment on 16 bytes
-
-  initialVelocities[i + 0] = Math.random() * 0.5;
-  initialVelocities[i + 1] = Math.random() * 0.5;
-  initialVelocities[i + 2] = Math.random() * 0.5;
-  initialVelocities[i + 3] = 0; // data alignment on 16 bytes
-
-  const random = Math.random();
-  if (random < 1 / 3) {
-    colors.set(red, i);
-  } else if (random < 2 / 3) {
-    colors.set(green, i);
-  } else {
-    colors.set(cyan, i);
-  }
-}
 
 export const boidsUniforms = {
   deltaTime: 0,
@@ -72,8 +38,8 @@ export const boidsUniforms = {
   alignmentDistance: 9,
   cohesionDistance: 12,
   borderForce: 0.3,
-  borderDistance: BOUNDS * 0.5,
-  bounds: BOUNDS,
+  borderDistance: BOUNDS * 0.25,
+  bounds: BOUNDS * 0.5,
 };
 
 export type BoidsUniforms = typeof boidsUniforms;
@@ -86,7 +52,7 @@ export const projectionMatrix = mat4.create();
 mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
 
 export const viewMatrix = mat4.create();
-mat4.translate(viewMatrix, viewMatrix, [0, 0, -BOUNDS * 2]);
+mat4.translate(viewMatrix, viewMatrix, [0, 0, -BOUNDS]);
 
 export const renderUniforms = {
   projectionMatrix,

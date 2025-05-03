@@ -3,14 +3,13 @@ import Layout from "../../layouts/Layout.astro";
 ---
 
 <script>
-  import { jsTime, renderTime, renderUniforms, canvasBackground, setAnimationLoop } from "../../shared";
+  import { jsTime, renderTime, renderUniforms, canvasBackground, setAnimationLoop, BOUNDS } from "../../shared";
   import { Pane } from "tweakpane";
   import { generateColors, generateInitialPositions, generateScales } from "../../shared/data";
   import { setupNaive } from "../../webgl/objects/naive";
   import { setupInstanced } from "../../webgl/objects/instanced";
 
   const MAX_COUNT = 15_000;
-  const BOUNDS = 200;
 
   const positions = generateInitialPositions(MAX_COUNT, BOUNDS);
   const colors = generateColors(MAX_COUNT);

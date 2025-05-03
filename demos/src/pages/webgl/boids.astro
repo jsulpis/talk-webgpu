@@ -7,22 +7,27 @@ import Layout from "../../layouts/Layout.astro";
   import {
     boidsUniforms,
     canvasBackground,
-    colors,
     computeTime,
-    COUNT,
-    initialPositions,
-    initialVelocities,
     jsTime,
     renderTime,
     renderUniforms,
     setAnimationLoop,
     speed,
+    BOUNDS,
   } from "../../shared";
   import vsSource from "../../webgl/boids/shaders/render.vert?raw";
   import fsSource from "../../webgl/boids/shaders/render.frag?raw";
   import { createStaticBuffer, initProgram } from "../../webgl/utils";
   import { useBoidsWebGL } from "../../webgl/boids/gpgpu";
   import { createPane, type Params } from "../../commons/tweakpane";
+  import { generateInitialPositions, generateInitialVelocities } from "../../shared/data";
+  import { generateColors } from "../../shared/data";
+
+  const COUNT = 5000;
+
+  const initialPositions = generateInitialPositions(COUNT, BOUNDS);
+  const initialVelocities = generateInitialVelocities(COUNT);
+  const colors = generateColors(COUNT);
 
   const params: Params = {
     api: "WebGL",

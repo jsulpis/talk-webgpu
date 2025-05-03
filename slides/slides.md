@@ -32,6 +32,7 @@ layout: none
 ---
 
 <em>clownfish.obj</em>
+
 ```md{all|4|13}
 # Blender 4.3.2
 # www.blender.org
@@ -130,6 +131,7 @@ $$
 ---
 
 <em>vertex.glsl</em>
+
 ```glsl{all|1|3-5|7-9|all}
 in vec4 aPosition;
 
@@ -154,6 +156,7 @@ void main() {
 ---
 
 <em>fragment.glsl</em>
+
 ```glsl{all|1-3|6-9|all}
 uniform sampler2D uColorTexture;
 uniform vec4 uLightColor;
@@ -197,9 +200,10 @@ layout: default
 # WebGL
 
 <em>main.js</em>
+
 ```js
-const canvas = document.querySelector('canvas');
-const gl = canvas.getContext('webgl2');
+const canvas = document.querySelector("canvas");
+const gl = canvas.getContext("webgl2");
 ```
 
 ---
@@ -245,6 +249,7 @@ backgroundSize: contain
 # WebGL
 
 <em>main.js</em>
+
 ```js
 gl.bindFramebuffer(...);
 gl.viewport(...);
@@ -278,6 +283,7 @@ layout: default
 # WebGL
 
 <em>main.js</em>
+
 ```js {all|1-9|10-18|all}
 function setup() {
   gl.createBuffer();
@@ -368,6 +374,7 @@ function draw(model) {
   gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
 }
 ```
+
 ```js
 function draw(model) {
   ...
@@ -389,12 +396,11 @@ function loop() {
   }
 </style>
 
-
 ---
 layout: default
 ---
 
-# WebGL 
+# WebGL
 
 <img class="mt-5" src="/webgl-cpu-overhead.png" alt="WebGL CPU Overhead" />
 
@@ -420,10 +426,10 @@ layout: none
 layout: none
 ---
 
-<DemoIframe path="/webgpu/boids" fallbackTitle="Démo WebGPU boids" />
+<DemoIframe path="/webgpu/objects" fallbackTitle="Démo WebGPU objets" />
 
 ---
 layout: none
 ---
 
-<DemoIframe path="/webgpu/objects" fallbackTitle="Démo WebGPU objets" />
+<DemoIframe path="/webgpu/boids" fallbackTitle="Démo WebGPU boids" />

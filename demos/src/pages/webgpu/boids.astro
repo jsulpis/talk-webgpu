@@ -7,20 +7,24 @@ import Layout from "../../layouts/Layout.astro";
   import {
     boidsUniforms,
     canvasBackground,
-    colors,
-    COUNT,
-    initialPositions,
-    initialVelocities,
     jsTime,
     renderTime,
     renderUniforms,
     setAnimationLoop,
     speed,
+    BOUNDS,
   } from "../../shared";
   import { useBoidsGPU } from "../../webgpu/boids/gpgpu";
   import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "../../webgpu/utils";
   import shaderSource from "../../webgpu/boids/shaders/render.wgsl?raw";
   import { createPane, type Params } from "../../commons/tweakpane";
+  import { generateInitialPositions, generateColors, generateInitialVelocities } from "../../shared/data";
+
+  const COUNT = 10_000;
+
+  const initialPositions = generateInitialPositions(COUNT, BOUNDS);
+  const initialVelocities = generateInitialVelocities(COUNT);
+  const colors = generateColors(COUNT);
 
   const params: Params = {
     api: "WebGPU",
@@ -51,6 +55,7 @@ import Layout from "../../layouts/Layout.astro";
     max: 20,
     step: 1,
   });
+  boidsFolder.hidden = true;
 
   async function main() {
     if (!navigator.gpu) {

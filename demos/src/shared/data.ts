@@ -15,6 +15,19 @@ export function generateInitialPositions(count: number, bounds: number) {
   return initialPositions;
 }
 
+export function generateInitialVelocities(count: number) {
+  let initialVelocities = new Float32Array(count * 4);
+
+  for (let i = 0; i < initialVelocities.length; i += 4) {
+    initialVelocities[i + 0] = Math.random() * 0.5;
+    initialVelocities[i + 1] = Math.random() * 0.5;
+    initialVelocities[i + 2] = Math.random() * 0.5;
+    initialVelocities[i + 3] = 0; // data alignment on 16 bytes
+  }
+
+  return initialVelocities;
+}
+
 export function generateColors(count: number) {
   let colors = new Float32Array(count * 4);
   const red = [1, 0.7, 0.1, 1];
