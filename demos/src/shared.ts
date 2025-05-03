@@ -27,7 +27,7 @@ export const computeElement = document.getElementById("compute")!;
 
 export const computeTime = new MovingAverage(100);
 export const renderTime = new MovingAverage(100);
-export const jsTime = new MovingAverage(100);
+export const jsTime = new MovingAverage(10);
 
 export const speed = 0.015;
 

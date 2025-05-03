@@ -34,3 +34,7 @@ export function generateColors(count: number) {
 
   return colors;
 }
+
+export function generateScales(count: number) {
+  return new Float32Array(count).map(() => Math.random() * 0.5 + 1);
+}
