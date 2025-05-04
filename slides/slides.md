@@ -315,7 +315,7 @@ function loop() {
 layout: none
 ---
 
-<DemoIframe path="/three/fishes?count=10&isolateFirst=true" fallbackTitle="Poisson isolé du groupe" />
+<DemoIframe path="/three/fishes?count=10&isolateFirst=true&start=offscreen" fallbackTitle="Poisson isolé du groupe" />
 
 ---
 layout: default
@@ -414,7 +414,43 @@ layout: none
 layout: none
 ---
 
-<DemoIframe path="/three/fishes?count=10&isolateFirst=false" fallbackTitle="Poisson dans le groupe" />
+<DemoIframe path="/three/fishes?count=10&isolateFirst=true" fallbackTitle="Poisson dans le groupe" />
+
+---
+layout: statement
+---
+
+# Tuto sociabilité
+
+---
+layout: default
+---
+
+# Cohésion
+
+<img class="h-100 mx-auto -mt-10" src="/boids-1.png" alt="Cohésion" />
+
+---
+layout: default
+---
+
+# Alignement
+
+<img class="h-100 mx-auto -mt-10" src="/boids-2.png" alt="Alignement" />
+
+---
+layout: default
+---
+
+# Séparation
+
+<img class="h-100 mx-auto -mt-10" src="/boids-3.png" alt="Séparation" />
+
+---
+layout: none
+---
+
+<DemoIframe path="/three/fishes?count=10" fallbackTitle="Poisson avec le groupe" />
 
 ---
 layout: none

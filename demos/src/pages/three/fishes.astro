@@ -8,7 +8,7 @@ import Layout from "../../layouts/Layout.astro";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
   import { clone } from "three/addons/utils/SkeletonUtils.js";
   import { computePositions, computeVelocities } from "../../three/gpgpu";
-  import { canvasBackground, computeTime, renderTime, setAnimationLoop } from "../../shared";
+  import { canvasBackground, renderTime, setAnimationLoop } from "../../shared";
   import { type Params } from "../../commons/tweakpane";
   import { Pane } from "tweakpane";
 
@@ -39,6 +39,7 @@ import Layout from "../../layouts/Layout.astro";
   };
 
   const isolateFirst = searchParams.get("isolateFirst") === "true";
+  const startOffscreen = searchParams.get("start") === "offscreen";
 
   const models: THREE.Object3D[] = [];
   const MAX_COUNT = 1000;
@@ -73,10 +74,14 @@ import Layout from "../../layouts/Layout.astro";
       positionsBufferA[i + 0] = (-Math.random() * 0.25 + 0.75) * BOUNDS * 2 - BOUNDS;
       positionsBufferA[i + 1] = (-Math.random() * 0.25 + 0.75) * BOUNDS * 2 - BOUNDS;
       positionsBufferA[i + 2] = (-Math.random() * 0.25 + 0.75) * BOUNDS * 2 - BOUNDS;
-    } else {
+    } else if (startOffscreen) {
       positionsBufferA[i + 0] = BOUNDS * 3;
       positionsBufferA[i + 1] = BOUNDS * 3;
       positionsBufferA[i + 2] = BOUNDS * 3;
+    } else {
+      positionsBufferA[i + 0] = BOUNDS * 2;
+      positionsBufferA[i + 1] = BOUNDS / 2;
+      positionsBufferA[i + 2] = BOUNDS / 2;
     }
   }
   let positionsBufferB = new Float32Array(MAX_COUNT * 3);

@@ -90,8 +90,6 @@ import Layout from "../../layouts/Layout.astro";
     const coordsBuffer = createStaticBuffer(gl, coords);
     const indexBuffer = createStaticBuffer(gl, geometry.indices, gl.ELEMENT_ARRAY_BUFFER);
 
-    let lastTime = performance.now();
-
     const { isGPUTimeAvailable, updateGPUTime, getGPUTime, endGPUTime } = useGPUTimer(gl);
 
     function drawScene(positionsTexture: WebGLTexture, velocitiesTexture: WebGLTexture) {
@@ -139,11 +137,16 @@ import Layout from "../../layouts/Layout.astro";
       gl.drawElementsInstanced(gl.TRIANGLES, geometry.indices.length, gl.UNSIGNED_SHORT, 0, COUNT);
     }
 
-    setAnimationLoop(function render({ deltaTime, startTime }) {
+    let lastTime = 0;
+
+    setAnimationLoop(function render({ startTime }) {
       if (!isGPUTimeAvailable()) {
         // still computing the previous frame, skip this frame
         return;
       }
+      const deltaTime = startTime - lastTime;
+      lastTime = startTime;
+
       boidsUniforms.deltaTime = deltaTime * speed;
 
       getGPUTime();
