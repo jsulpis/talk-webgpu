@@ -2,6 +2,7 @@
 defineProps<{
   path: string;
   fallbackTitle: string;
+  delay?: string;
 }>();
 </script>
 
@@ -31,6 +32,17 @@ defineProps<{
     font-size: 4rem;
     place-self: center;
     text-align: center;
+  }
+}
+
+iframe {
+  animation: fadeIn 800ms both;
+  animation-delay: v-bind(delay);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
   }
 }
 </style>

@@ -453,10 +453,148 @@ layout: none
 <DemoIframe path="/three/fishes?count=10" fallbackTitle="Poisson avec le groupe" />
 
 ---
+layout: center
+---
+
+# GPGPU
+
+General Purpose computing on Graphics Processing Units
+
+---
+layout: default
+---
+
+# Render Pipeline
+
+<img class="-mt-20 -z-1 scale-110 relative" src="/render-pipeline.png" alt="Render pipeline" />
+
+---
+layout: center
+---
+
+<div class="stack">
+  <img v-click.hide class="h-80 mx-auto" src="/marin-1.png" alt="Image de Marin" />
+  <img v-after class="h-80 mx-auto" src="/marin-2.png" alt="Rectangle avec 2 triangles" />
+  <img v-click class="h-80 mx-auto" src="/marin-3.png" alt="Rectangle avec 2 triangles pixellisés" />
+</div>
+
+---
+layout: default
+---
+
+## Niveaux de gris
+
+<em>fragment.glsl</em>
+
+```glsl{all}
+void main() {
+  ...
+  vec3 originalColor = getTextureValue(pixelPosition);
+  vec3 grayscaleColor = grayscale(originalColor);
+  ...
+}
+```
+
+---
+layout: default
+---
+
+## Niveaux de gris
+
+<em>fragment.glsl</em>
+
+```glsl{all}
+void main() {
+  ...
+  vec3 originalColor = getTextureValue(pixelPosition);
+  vec3 grayscaleColor = grayscale(originalColor);
+  ...
+}
+```
+
+## Positions
+
+<em>fragment.glsl</em>
+
+```glsl{all}
+void main() {
+  ...
+  vec3 currentPosition = getTextureValue(pixelPosition);
+  vec3 newPosition = updatePosition(currentPosition);
+  ...
+}
+```
+
+---
+layout: default
+---
+
+# Render Pipeline
+
+<img class="" src="/gpgpu-pipeline.png" alt="Render pipeline avec image" />
+
+---
+layout: default
+---
+
+# GPGPU
+
+<img class="" src="/gpgpu-pipeline2.png" alt="Render pipeline avec texture de positions" />
+
+---
+layout: default
+---
+
+# GPGPU
+
+<RenderWhen :context="['visible']">
+  <LineGraph />
+</RenderWhen>
+
+---
 layout: none
 ---
 
-<DemoIframe path="/webgl/boids" fallbackTitle="Démo WebGL boids" />
+<DemoIframe path="/webgl/boids" fallbackTitle="Démo WebGL boids" delay="1s" />
+
+---
+layout: default
+---
+
+# WebGL 👎
+
+<v-clicks>
+
+- API proche du C
+- état global
+- surcharge CPU sur les grosses scènes
+- pixelliser des triangles pour faire des calculs
+
+</v-clicks>
+
+<style>
+  ul {
+    font-size: 1.25em;
+    margin-top: 2em;
+
+    li {
+      padding-left: .5em;
+    }
+  }
+</style>
+
+---
+layout: default
+---
+
+# WebGL vs WebGPU
+
+| **WebGL**                    | **WebGPU**                               |
+| ---------------------------- | ---------------------------------------- |
+| syntaxe proche du C          | objets JS, Promise                       |
+| état global                  | gestion fine des buffers                 |
+| surcharge CPU                | charge CPU très réduite (render bundles) |
+| calculs via Fragment Shaders | calculs via compute shaders              |
 
 ---
 layout: none
@@ -468,4 +606,4 @@ layout: none
 layout: none
 ---
 
-<DemoIframe path="/webgpu/boids" fallbackTitle="Démo WebGPU boids" />
+<DemoIframe path="/webgpu/boids" fallbackTitle="Démo WebGPU boids" delay="500ms" />
