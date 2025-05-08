@@ -4,28 +4,21 @@ import Chart from "chart.js/auto";
 
 const canvasElement = useTemplateRef("canvasElement");
 
-const js = {
-  label: "JavaScript",
-  borderDash: [],
-  data: [1.4, 2.4, 9.9, 37],
-  color: `hsl(40deg 90% 60%)`,
-};
-
-const webgl = {
-  label: "WebGL",
-  borderDash: [2, 6],
-  data: [0.2, 0.4, 1.2, 2.6],
-  color: `hsl(200deg 80% 45%)`,
-};
-
-const datasets = [js, webgl];
+const props = defineProps<{
+  datasets: Array<{
+    label: string;
+    borderDash: number[];
+    data: number[];
+    color: string;
+  }>;
+}>();
 
 onMounted(() => {
   new Chart(canvasElement.value!, {
     type: "line",
     data: {
       labels: ["100", "200", "500", "1000"],
-      datasets: datasets.map((dataset) => ({
+      datasets: props.datasets.map((dataset) => ({
         borderDash: dataset.borderDash,
         borderJoinStyle: "round",
         borderCapStyle: "round",

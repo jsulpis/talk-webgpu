@@ -11,13 +11,16 @@ import Layout from "../../layouts/Layout.astro";
 
   const MAX_COUNT = 15_000;
 
-  const positions = generateInitialPositions(MAX_COUNT, BOUNDS);
-  const colors = generateColors(MAX_COUNT);
-  const scales = generateScales(MAX_COUNT);
+  const countParam = new URL(window.location.href).searchParams.get("count");
+  const count = Number(countParam || MAX_COUNT);
+
+  const positions = generateInitialPositions(count, BOUNDS);
+  const colors = generateColors(count);
+  const scales = generateScales(count);
 
   const params = {
     api: "WebGL",
-    objects: 10,
+    objects: Number(countParam || 10),
     method: "naive",
     jsTime: "0ms",
     renderTime: "0ms",
@@ -30,12 +33,21 @@ import Layout from "../../layouts/Layout.astro";
     label: "api",
   });
 
-  pane.addBinding(params, "objects", {
-    label: "objects",
-    min: 1,
-    max: MAX_COUNT,
-    step: 1,
-  });
+  if (countParam) {
+    console.log("countParam", countParam);
+    pane.addBinding(params, "objects", {
+      label: "objects",
+      readonly: true,
+      format: (v) => v.toFixed(0),
+    });
+  } else {
+    pane.addBinding(params, "objects", {
+      label: "objects",
+      min: 1,
+      max: MAX_COUNT,
+      step: 1,
+    });
+  }
 
   pane.addBinding(params, "method", {
     view: "list",
