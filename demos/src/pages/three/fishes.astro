@@ -46,7 +46,7 @@ import Layout from "../../layouts/Layout.astro";
   const isFinalScreen = params.objects > 1 && !isolateFirst;
 
   if (isFinalScreen) {
-    const pane = new Pane();
+    const pane = new Pane({ title: "Paramètres", expanded: false });
 
     pane.addBinding(params, "objects", {
       label: "objets",
