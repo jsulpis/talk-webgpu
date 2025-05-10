@@ -21,11 +21,7 @@ struct VertexOutput {
 }
 
 @vertex
-fn vertexMain(
-  @location(0) position: vec4f,
-  @location(1) normal: vec3f,
-  @builtin(instance_index) instanceIndex: u32,
-) -> VertexOutput {
+fn vertexMain(@location(0) position: vec4f, @location(1) normal: vec3f) -> VertexOutput {
   var output: VertexOutput;
   let scale = modelUniforms.scale;
   let modelPosition = modelUniforms.position;

@@ -130,55 +130,13 @@ $$
 
 ---
 
-<em>vertex.glsl</em>
-
-```glsl{all|1|3-5|7-9|all}
-in vec4 aPosition;
-
-uniform mat4 uModelMatrix;
-uniform mat4 uViewMatrix;
-uniform mat4 uProjectionMatrix;
-
-void main() {
-  gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aPosition;
-}
-```
-
----
-
 <div class="stack">
   <img class="h-[70%]" src="/pixelate-1.png" alt="vertices" />
   <img class="h-[70%]" v-click src="/pixelate-2.png" alt="triangle" />
   <img class="h-[70%]" v-click src="/pixelate-3.png" alt="pixelated" />
   <img class="h-[70%]" v-click src="/pixelate-4.png" alt="pixels in triangle" />
-</div>
-
----
-
-<em>fragment.glsl</em>
-
-```glsl{all|1-3|6-9|all}
-uniform sampler2D uColorTexture;
-uniform vec4 uLightColor;
-uniform vec3 uLightDirection;
-...
-
-void main() {
-  vec4 color = ...;
-  gl_FragColor = color;
-}
-```
-
-<style>
-  .shiki {
-    --slidev-code-font-size: 1rem;
-  }
-</style>
-
----
-
-<div class="stack">
-  <img class="h-[70%]" src="/blending.png" alt="blending" />
+  <img class="h-[70%]" v-click src="/pixelate-5.png" alt="pixels with color" />
+  <img class="h-[70%]" v-click src="/blending.png" alt="blending" />
 </div>
 
 ---
@@ -189,6 +147,8 @@ layout: default
 
 <img class="-mt-20 -z-1 scale-110 relative" src="/render-pipeline.png" alt="Render pipeline" />
 
+---
+layout: statement
 ---
 
 # WebGL
@@ -273,6 +233,52 @@ gl.drawElements(...);
 <style>
   .shiki {
     --slidev-code-font-size: 0.85rem;
+  }
+</style>
+
+---
+layout: default
+---
+
+# WebGL
+
+<em>vertex.glsl</em>
+
+```glsl{all|1|3-5|7-9|all}
+in vec4 position;
+
+uniform mat4 modelMatrix;
+uniform mat4 viewMatrix;
+uniform mat4 projectionMatrix;
+
+void main() {
+  gl_Position = projectionMatrix * viewMatrix * modelMatrix * position;
+}
+```
+
+---
+layout: default
+---
+
+# WebGL
+
+<em>fragment.glsl</em>
+
+```glsl{all|1|2-6|7-12|all}
+in vec2 uv;
+
+uniform vec3 lightColor;
+uniform vec3 lightDirection;
+uniform sampler2D colorTexture;
+
+void main() {
+  gl_FragColor = vec4(...);
+}
+```
+
+<style>
+  .shiki {
+    --slidev-code-font-size: 1rem;
   }
 </style>
 
@@ -547,6 +553,8 @@ layout: default
 
 # GPGPU
 
+Calcul de la nouvelle position des poissons
+
 <RenderWhen :context="['visible']">
   <LineGraph :datasets="[
     {
@@ -574,7 +582,7 @@ layout: none
 layout: default
 ---
 
-# WebGL 👎
+# WebGL : les inconvénients
 
 <v-clicks>
 
@@ -588,7 +596,6 @@ layout: default
 <style>
   ul {
     font-size: 1.25em;
-    margin-top: 2em;
 
     li {
       padding-left: .5em;
@@ -622,7 +629,7 @@ layout: center
 <span v-click class="absolute right-20 top-20 text-5xl">😎</span>
 
 ---
-layout: center
+layout: statement
 ---
 
 # WebGPU
@@ -712,6 +719,76 @@ const pipeline = device.createRenderPipeline({
 layout: default
 ---
 
+# WebGL shaders
+
+```glsl
+in vec4 position;
+
+uniform mat4 modelMatrix;
+uniform mat4 viewMatrix;
+uniform mat4 projectionMatrix;
+
+void main() {
+  gl_Position = projectionMatrix * viewMatrix * modelMatrix * position;
+}
+```
+
+```glsl
+in vec2 uv;
+
+uniform vec3 lightColor;
+uniform vec3 lightDirection;
+uniform sampler2D colorTexture;
+
+void main() {
+  gl_FragColor = vec4(...);
+}
+```
+
+<style>
+  .shiki {
+    --slidev-code-font-size: 0.85rem;
+  }
+</style>
+
+---
+layout: default
+---
+
+# WebGPU shaders
+
+```wgsl
+struct Uniforms {
+  modelMatrix: mat4x4f,
+  viewMatrix: mat4x4f,
+  projectionMatrix: mat4x4f,
+  lightDirection: vec3f,
+  lightColor: vec3f,
+}
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
+@vertex
+fn vertexMain(@location(0) position: vec4f) -> @builtin(position) vec4f {
+  return uniforms.projectionMatrix * uniforms.viewMatrix * uniforms.modelMatrix * position;
+}
+
+@fragment
+fn fragmentMain() -> @location(0) vec4f {
+  return vec4f(1.0, 0.0, 0.0, 1.0); // Rouge
+}
+```
+
+<style>
+  .shiki {
+    --slidev-code-font-size: 0.85rem;
+  }
+</style>
+
+---
+layout: default
+---
+
 # API WebGPU
 
 ```js {all|1-5|7-20}
@@ -753,13 +830,13 @@ layout: default
 layout: none
 ---
 
-<DemoIframe path="/webgl/objects?count=15000" fallbackTitle="Démo WebGL objets" />
+<DemoIframe path="/webgl/objects?count=15000" fallbackTitle="WebGL objets" />
 
 ---
 layout: none
 ---
 
-<DemoIframe path="/webgpu/objects" fallbackTitle="Démo WebGPU objets" />
+<DemoIframe path="/webgpu/objects" fallbackTitle="WebGPU objets" />
 
 ---
 layout: none
@@ -772,6 +849,51 @@ layout: none
     margin: auto;
   }
 </style>
+
+---
+layout: default
+---
+
+# WebGPU Render Bundles
+
+```ts{1-10|12,16}
+function setup() {
+  const bundleEncoder = device.createRenderBundleEncoder(...);
+  for (let object of objects) {
+    bundleEncoder.setPipeline(pipeline);
+    bundleEncoder.setVertexBuffer(0, positionBuffer);
+    bundleEncoder.setBindGroup(0, object.bindGroup);
+    bundleEncoder.draw(...);
+  }
+  renderBundle = bundleEncoder.finish();
+}
+
+function loop() {
+  const commandEncoder = device.createCommandEncoder();
+  const renderPass = commandEncoder.beginRenderPass(...);
+
+  renderPass.executeBundles([renderBundle]);
+
+  renderPass.end();
+  device.queue.submit([commandEncoder.finish()]);
+}
+```
+
+<style>
+  .shiki {
+    --slidev-code-font-size: 0.85rem;
+  }
+</style>
+
+---
+layout: default
+---
+
+# WebGPU Render Bundles
+
+Rendu de scènes complexes en temps CPU constant 🎉
+
+<img class="mt-15" src="/webgpu-render-bundle.png" alt="WebGPU Render Bundle" />
 
 ---
 layout: center
@@ -901,20 +1023,27 @@ layout: default
 <img src="/compute-matrices.png" alt="Multiplication de matrices avec un compute shader" />
 
 ---
-layout: default
+layout: center
 ---
 
-# WebGL vs WebGPU
+<!-- # WebGL vs WebGPU -->
 
 | **WebGL**                    | **WebGPU**                               |
 | ---------------------------- | ---------------------------------------- |
 | syntaxe proche du C          | objets JS, Promise                       |
-| état global                  | gestion fine des buffers                 |
+| état global                  | opérations encapsulées dans des "passes" |
 | surcharge CPU                | charge CPU très réduite (render bundles) |
-| calculs via Fragment Shaders | calculs via compute shaders              |
+| calculs via fragment shaders | calculs via compute shaders              |
+
+<style>
+  td, th {
+    font-size: 1.2em;
+    padding-inline: 2rem;
+  }
+</style>
 
 ---
-layout: center
+layout: statement
 ---
 
 # Écosystème WebGPU
