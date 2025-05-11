@@ -10,15 +10,22 @@ drawings:
 transition: fade
 title: "La Révolution WebGPU : des animations plus folles, des calculs plus rapides, hors du navigateur ? 🤯"
 info: "Présentation sur WebGPU"
+layout: statement
 ---
 
-# {{$slidev.configs.title}}
+<div class="text-left absolute text-2xl line-height-1.2 top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] text-center">
+  <h1 class="w-[32ch] text-[2.5rem]! line-height-[1.2]!">La Révolution WebGPU : des animations plus folles, des calculs plus rapides,<br/>hors du navigateur ? 🤯</h1>
+  <strong class="text-3xl mt-8! block">Julien Sulpis</strong>
 
----
-layout: none
----
+  <p class="mt-2! mb-2!">Technozaure - Zenika Lyon</p>
+  <p class="m-0! text-xl">16/05/2025</p>
+</div>
 
-<DemoIframe path="/three/fishes?count=1" fallbackTitle="Poisson seul" />
+<RenderWhen :context="['slide']">
+  <RenderWhen :context="['visible']">
+    <iframe class="absolute pointer-events-none w-full h-full transform-origin-[top_left] scale-130 top-0 left-0" :src="`${$slidev.configs.demosBaseUrl}/three/fishes?count=1`"></iframe>
+  </RenderWhen>
+</RenderWhen>
 
 ---
 layout: none

@@ -4,7 +4,7 @@
 }
 
 .slidev-layout {
-  p {
+  &.default p {
     margin: 0 !important;
   }
 

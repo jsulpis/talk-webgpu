@@ -13,7 +13,6 @@ import Layout from "../../layouts/Layout.astro";
   import { Pane } from "tweakpane";
 
   const BOUNDS = 30;
-  const speed = 0.008;
 
   const boidsUniforms = {
     deltaTime: 0,
@@ -43,7 +42,10 @@ import Layout from "../../layouts/Layout.astro";
 
   const models: THREE.Object3D[] = [];
   const MAX_COUNT = 1000;
+  const isFirstScreen = params.objects === 1;
   const isFinalScreen = params.objects > 1 && !isolateFirst;
+
+  const speed = isFirstScreen ? 0.004 : 0.008;
 
   if (isFinalScreen) {
     const pane = new Pane({ title: "Paramètres", expanded: false });
@@ -149,7 +151,9 @@ import Layout from "../../layouts/Layout.astro";
   /****************************************************************** */
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(...canvasBackground.slice(0, 3));
+  if (!isFirstScreen) {
+    scene.background = new THREE.Color(...canvasBackground.slice(0, 3));
+  }
 
   let mixer: THREE.AnimationMixer;
 
@@ -164,9 +168,13 @@ import Layout from "../../layouts/Layout.astro";
   const cube = new THREE.Mesh(geometry, material);
   // scene.add(cube);
 
-  const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector("canvas")!, antialias: true });
+  const renderer = new THREE.WebGLRenderer({
+    canvas: document.querySelector("canvas")!,
+    antialias: true,
+    alpha: isFirstScreen,
+  });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(2);
 
   // for consistency with the other demos + make colors more flashy
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
@@ -201,7 +209,7 @@ import Layout from "../../layouts/Layout.astro";
       let action = mixer.clipAction(gltf.animations.find((clip) => clip.name.includes("Swimming_Fast"))!);
       action.play();
 
-      if (params.objects === 1) {
+      if (isFirstScreen) {
         model.scale.set(1.5, 1.5, 1.5);
         return;
       }
@@ -270,7 +278,7 @@ import Layout from "../../layouts/Layout.astro";
 
     moveModels(positionsBuffers.read, velocityBuffers.read);
 
-    mixer?.update(deltaTime / 1000);
+    mixer?.update(isFirstScreen ? deltaTime / 2000 : deltaTime / 1000);
 
     performance.mark("render");
     renderer.render(scene, camera);
