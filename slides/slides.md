@@ -8,13 +8,13 @@ demosBaseUrl: http://localhost:4321
 drawings:
   persist: false
 transition: fade
-title: "La Révolution WebGPU : des animations plus folles, des calculs plus rapides, hors du navigateur ? 🤯"
+title: "La révolution WebGPU : des animations plus folles, des calculs plus rapides, hors du navigateur ? 🤯"
 info: "Présentation sur WebGPU"
 layout: statement
 ---
 
-<div class="text-left absolute text-2xl line-height-1.2 top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] text-center">
-  <h1 class="w-[32ch] text-[2.5rem]! line-height-[1.2]!">La Révolution WebGPU : des animations plus folles, des calculs plus rapides,<br/>hors du navigateur ? 🤯</h1>
+<div class="text-left absolute text-2xl line-height-1.2 top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] text-center -mt-5">
+  <h1 class="w-[32ch] text-[2.5rem]! line-height-[1.2]!">La révolution WebGPU : toute la puissance du GPU, sur le web et en dehors 🚀</h1>
   <strong class="text-3xl mt-8! block">Julien Sulpis</strong>
 
   <p class="mt-2! mb-2!">Technozaure - Zenika Lyon</p>
