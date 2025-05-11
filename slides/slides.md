@@ -152,7 +152,10 @@ layout: default
 
 # Render Pipeline
 
-<img class="-mt-20 -z-1 scale-110 relative" src="/render-pipeline.png" alt="Render pipeline" />
+<div class="stack -translate-y-10">
+  <img v-click.hide class="transition-duration-0 scale-110" src="/render-pipeline-base.png" alt="Render pipeline" />
+  <img v-after class="transition-duration-0 scale-110" src="/render-pipeline.png" alt="Render pipeline" />
+</div>
 
 ---
 layout: statement
@@ -241,7 +244,7 @@ layout: default
 
 # Render Pipeline
 
-<img class="-mt-20 -z-1 scale-110 relative" src="/render-pipeline.png" alt="Render pipeline" />
+<img class="mt-8 scale-110" src="/render-pipeline.png" alt="Render pipeline" />
 
 ---
 layout: default
@@ -384,7 +387,7 @@ layout: default
 
 # Render Pipeline
 
-<img class="-mt-20 -z-1 scale-110 relative" src="/render-pipeline.png" alt="Render pipeline" />
+<img class="mt-8 scale-110" src="/render-pipeline.png" alt="Render pipeline" />
 
 ---
 layout: center
@@ -511,7 +514,7 @@ layout: default
 
 # Render Pipeline
 
-<img class="-mt-20 -z-1 scale-110 relative" src="/render-pipeline.png" alt="Render pipeline" />
+<img class="mt-8 scale-110" src="/render-pipeline.png" alt="Render pipeline" />
 
 ---
 layout: default
