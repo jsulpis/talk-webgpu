@@ -98,7 +98,7 @@ import Layout from "../../layouts/Layout.astro";
 
   const renderer = new THREE.WebGPURenderer({ canvas: document.querySelector("canvas")!, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(2);
   renderer.setAnimationLoop(animate);
 
   console.log(renderer.backend);

@@ -41,6 +41,7 @@ import Layout from "../../layouts/Layout.astro";
 
   async function main() {
     const canvas = document.querySelector("canvas")!;
+    const devicePixelRatio = 2;
     canvas.width = window.innerWidth * devicePixelRatio;
     canvas.height = window.innerHeight * devicePixelRatio;
 

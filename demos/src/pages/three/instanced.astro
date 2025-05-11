@@ -39,7 +39,7 @@ import Layout from "../../layouts/Layout.astro";
   });
 
   const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector("canvas")!, antialias: true });
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(2);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setAnimationLoop(animate);
 

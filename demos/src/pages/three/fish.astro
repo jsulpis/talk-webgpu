@@ -18,7 +18,7 @@ import Layout from "../../layouts/Layout.astro";
 
   const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector("canvas")!, antialias: true, alpha: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(2);
 
   // for consistency with the other demos + make colors more flashy
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
@@ -47,7 +47,7 @@ import Layout from "../../layouts/Layout.astro";
     loader.load(mainFishUrl, function (gltf) {
       const model = gltf.scene;
       model.lookAt(new THREE.Vector3(1, 0.25, 0.6));
-      model.position.x = 0.4;
+      model.position.x = 0.45;
       model.traverse(fixMaterial);
 
       scene.add(model);

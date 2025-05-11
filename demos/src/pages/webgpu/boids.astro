@@ -76,6 +76,7 @@ import Layout from "../../layouts/Layout.astro";
     const { querySet, resolveBuffer, resultBuffer, timestampWrites } = initTimingObjects(device);
 
     const canvas = document.querySelector("canvas")!;
+    const devicePixelRatio = 2;
     canvas.width = window.innerWidth * devicePixelRatio;
     canvas.height = window.innerHeight * devicePixelRatio;
     document.body.appendChild(canvas);
