@@ -1,0 +1,172 @@
+<!-- Laser pointer shown with Shift + X, taken and optimized from : https://codepen.io/byeolbit/pen/EEbpoJ?anon=true&view=pen -->
+<head>
+  <style>
+    .pointingjs {
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      top: 0;
+      left: 0;
+
+      .pointer {
+        width: 14px;
+        height: 14px;
+        border-radius: 100%;
+        transform: translate(-50%, -50%);
+        position: fixed;
+        background-color: red;
+        box-shadow: 0 0 8px red;
+      }
+
+      .trail {
+        border-radius: 100%;
+      }
+
+      svg {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+      }
+
+      #trail {
+        filter: url(#glow);
+        stroke: url(#linear);
+        stroke-width: 3;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="pointingjs">
+    <div class="pointer"></div>
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow">
+          <fegaussianblur
+            class="blur"
+            result="coloredBlur"
+            stddeviation="4"
+          ></fegaussianblur>
+          <femerge>
+            <femergenode in="coloredBlur"></femergenode>
+            <femergenode in="coloredBlur"></femergenode>
+            <femergenode in="coloredBlur"></femergenode>
+            <femergenode in="SourceGraphic"></femergenode>
+          </femerge>
+        </filter>
+        <linearGradient id="linear">
+          <stop offset="0" stop-color="red" stop-opacity="0" />
+          <stop offset="1" stop-color="red" />
+        </linearGradient>
+      </defs>
+      <path
+        id="trail"
+        fill="transparent"
+        d="M10 10  20 20"
+        result="coloredBlur"
+      />
+    </svg>
+  </div>
+
+  <script>
+    const pointer = document.querySelector(".pointer");
+    let trail = [];
+    const trailElement = document.getElementById("trail");
+    const gradient = document.getElementById("linear");
+    const mouse = { X: 0, Y: 0 };
+
+    let animationFrameHandle;
+
+    function animate() {
+      draw();
+      animationFrameHandle = requestAnimationFrame(animate);
+    }
+
+    function setPointerVisible(visible) {
+      pointer.style.visibility = visible ? "visible" : "hidden";
+      trailElement.style.visibility = visible ? "visible" : "hidden";
+      document.documentElement.style.cursor = visible ? "none" : "auto";
+    }
+
+    setPointerVisible(false);
+
+    function showPointer() {
+      trail = [];
+      removeEventListener("keydown", handleKeyDown);
+      addEventListener("mousemove", movePointer);
+      addEventListener("keyup", releasePointer, { once: true });
+    }
+
+    function handleKeyDown(e) {
+      if (event.key === "X" && event.shiftKey) {
+        movePointer(e);
+        showPointer();
+      }
+    }
+
+    function movePointer(e) {
+      pointer.style.top = `${e.pageY}px`;
+      pointer.style.left = `${e.pageX}px`;
+      mouse.X = e.pageX;
+      mouse.Y = e.pageY;
+
+      if (trail.length === 0) {
+        trail = Array.from({ length: 12 }, () => ({ X: mouse.X, Y: mouse.Y }));
+        setPointerVisible(true);
+        cancelAnimationFrame(animationFrameHandle);
+        animate();
+      }
+    }
+
+    function releasePointer(e) {
+      cancelAnimationFrame(animationFrameHandle);
+      setPointerVisible(false);
+      removeEventListener("mousemove", movePointer);
+      addEventListener("keydown", handleKeyDown);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    function draw() {
+      if (trail.length === 0) return;
+      let x = mouse.X;
+      let y = mouse.Y;
+
+      for (let i = 0; i < 12; i++) {
+        const nextDot = trail[i + 1] || trail[0];
+        trail[i].X = x;
+        trail[i].Y = y;
+        x += (nextDot.X - x) * 0.4;
+        y += (nextDot.Y - y) * 0.4;
+      }
+
+      const dx = mouse.X - trail[1].X;
+      const dy = mouse.Y - trail[1].Y;
+
+      let x1 = 0,
+        y1 = 0,
+        x2 = 0,
+        y2 = 0;
+
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 0) x2 = 1;
+        else x1 = 1;
+      } else {
+        if (dy > 0) y2 = 1;
+        else y1 = 1;
+      }
+
+      gradient.setAttribute("x1", x1);
+      gradient.setAttribute("y1", y1);
+      gradient.setAttribute("x2", x2);
+      gradient.setAttribute("y2", y2);
+
+      const M = `M ${trail[11].X}, ${trail[11].Y} `;
+      const C = `C ${trail[6].X}, ${trail[6].Y} ${trail[6].X}, ${trail[6].Y} ${trail[5].X}, ${trail[5].Y} `;
+      const S = `S ${trail[2].X}, ${trail[2].Y} ${trail[1].X}, ${trail[1].Y} ${trail[1].X}, ${trail[1].Y} ${mouse.X}, ${mouse.Y}`;
+
+      trailElement.setAttribute("d", M + C + S);
+    }
+  </script>
+</body>
