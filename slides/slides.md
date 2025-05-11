@@ -169,19 +169,6 @@ layout: default
 <em>main.js</em>
 
 ```js
-const canvas = document.querySelector("canvas");
-const gl = canvas.getContext("webgl2");
-```
-
----
-layout: default
----
-
-# WebGL
-
-<em>main.js</em>
-
-```js
 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 gl.clearColor(1, 1, 1, 1);
@@ -204,88 +191,6 @@ gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
 <style>
   .shiki {
     --slidev-code-font-size: 0.85rem;
-  }
-</style>
-
----
-layout: image-right
-image: /render-pipeline.png
-backgroundSize: contain
----
-
-# WebGL
-
-<em>main.js</em>
-
-```js
-gl.bindFramebuffer(...);
-gl.viewport(...);
-gl.clearColor(...);
-gl.clear(...);
-...
-gl.bindBuffer(...);
-gl.vertexAttribPointer(...);
-gl.enableVertexAttribArray(...);
-...
-gl.useProgram(...);
-gl.uniformMatrix4fv(...);
-gl.uniformMatrix4fv(...);
-gl.uniform3fv(...);
-gl.uniform3fv(...);
-...
-gl.bindBuffer(...);
-gl.drawElements(...);
-```
-
-<style>
-  .shiki {
-    --slidev-code-font-size: 0.85rem;
-  }
-</style>
-
----
-layout: default
----
-
-# WebGL
-
-<em>vertex.glsl</em>
-
-```glsl{all|1|3-5|7-9|all}
-in vec4 position;
-
-uniform mat4 modelMatrix;
-uniform mat4 viewMatrix;
-uniform mat4 projectionMatrix;
-
-void main() {
-  gl_Position = projectionMatrix * viewMatrix * modelMatrix * position;
-}
-```
-
----
-layout: default
----
-
-# WebGL
-
-<em>fragment.glsl</em>
-
-```glsl{all|1|2-6|7-12|all}
-in vec2 uv;
-
-uniform vec3 lightColor;
-uniform vec3 lightDirection;
-uniform sampler2D colorTexture;
-
-void main() {
-  gl_FragColor = vec4(...);
-}
-```
-
-<style>
-  .shiki {
-    --slidev-code-font-size: 1rem;
   }
 </style>
 
@@ -430,7 +335,7 @@ layout: none
 <DemoIframe path="/three/fishes?count=10&isolateFirst=true" fallbackTitle="Poisson dans le groupe" />
 
 ---
-layout: statement
+layout: center
 ---
 
 # Tuto sociabilité
@@ -490,53 +395,6 @@ layout: center
   <img v-after class="h-80 mx-auto" src="/marin-2.png" alt="Rectangle avec 2 triangles" />
   <img v-click class="h-80 mx-auto" src="/marin-3.png" alt="Rectangle avec 2 triangles pixellisés" />
 </div>
-
----
-layout: default
----
-
-## Niveaux de gris
-
-<em>fragment.glsl</em>
-
-```glsl{all}
-void main() {
-  ...
-  vec3 originalColor = getTextureValue(pixelPosition);
-  vec3 grayscaleColor = grayscale(originalColor);
-  ...
-}
-```
-
----
-layout: default
----
-
-## Niveaux de gris
-
-<em>fragment.glsl</em>
-
-```glsl{all}
-void main() {
-  ...
-  vec3 originalColor = getTextureValue(pixelPosition);
-  vec3 grayscaleColor = grayscale(originalColor);
-  ...
-}
-```
-
-## Positions
-
-<em>fragment.glsl</em>
-
-```glsl{all}
-void main() {
-  ...
-  vec3 currentPosition = getTextureValue(pixelPosition);
-  vec3 newPosition = updatePosition(currentPosition);
-  ...
-}
-```
 
 ---
 layout: default
@@ -714,76 +572,6 @@ const pipeline = device.createRenderPipeline({
     cullMode: "back",
   },
 });
-```
-
-<style>
-  .shiki {
-    --slidev-code-font-size: 0.85rem;
-  }
-</style>
-
----
-layout: default
----
-
-# WebGL shaders
-
-```glsl
-in vec4 position;
-
-uniform mat4 modelMatrix;
-uniform mat4 viewMatrix;
-uniform mat4 projectionMatrix;
-
-void main() {
-  gl_Position = projectionMatrix * viewMatrix * modelMatrix * position;
-}
-```
-
-```glsl
-in vec2 uv;
-
-uniform vec3 lightColor;
-uniform vec3 lightDirection;
-uniform sampler2D colorTexture;
-
-void main() {
-  gl_FragColor = vec4(...);
-}
-```
-
-<style>
-  .shiki {
-    --slidev-code-font-size: 0.85rem;
-  }
-</style>
-
----
-layout: default
----
-
-# WebGPU shaders
-
-```wgsl
-struct Uniforms {
-  modelMatrix: mat4x4f,
-  viewMatrix: mat4x4f,
-  projectionMatrix: mat4x4f,
-  lightDirection: vec3f,
-  lightColor: vec3f,
-}
-
-@group(0) @binding(0) var<uniform> uniforms: Uniforms;
-
-@vertex
-fn vertexMain(@location(0) position: vec4f) -> @builtin(position) vec4f {
-  return uniforms.projectionMatrix * uniforms.viewMatrix * uniforms.modelMatrix * position;
-}
-
-@fragment
-fn fragmentMain() -> @location(0) vec4f {
-  return vec4f(1.0, 0.0, 0.0, 1.0); // Rouge
-}
 ```
 
 <style>
@@ -1032,8 +820,6 @@ layout: default
 ---
 layout: center
 ---
-
-<!-- # WebGL vs WebGPU -->
 
 | **WebGL**                    | **WebGPU**                               |
 | ---------------------------- | ---------------------------------------- |
