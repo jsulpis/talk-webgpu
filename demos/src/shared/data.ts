@@ -30,9 +30,9 @@ export function generateInitialVelocities(count: number) {
 
 export function generateColors(count: number) {
   let colors = new Float32Array(count * 4);
-  const red = [1, 0.7, 0.1, 1];
-  const green = [0, 0.3, 1, 1];
-  const cyan = [0, 0.7, 1, 1];
+  const red = [1, 0.4, 0, 1];
+  const green = [0, 0.4, 1, 1];
+  const cyan = [0.9, 0.7, 0.2, 1];
 
   for (let i = 0; i < colors.length; i += 4) {
     const random = Math.random();

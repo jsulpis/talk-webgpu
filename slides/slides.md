@@ -161,7 +161,60 @@ layout: default
 layout: statement
 ---
 
-# WebGL
+<div class="container">
+  <h1>Web<span class="gl">GL</span></h1>
+  <h1>Web<span class="gpu">GPU</span></h1>
+</div>
+ 
+<style>
+.container {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+h1:first-child {
+  animation:
+    slide 2.5s 0.5s both cubic-bezier(0.5, 0, 0, 1),
+    slideWebGL 1.5s 0.2s both cubic-bezier(0.4, 0, 0.2, 1);
+}
+h1:last-child {
+  position: absolute;
+  animation:
+    slide 2.5s 0.5s both cubic-bezier(0.5, 0, 0, 1),
+    slideWebGPU 1.5s 0.2s both ease-in;
+}
+@keyframes slide {
+  from {
+    transform: translateY(-80%);
+  }
+}
+@keyframes slideWebGL {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0;
+  }
+  90% {
+    opacity: 1;
+  }
+}
+@keyframes slideWebGPU {
+  0%, 20% {
+    opacity: 0;
+  }
+  55% {
+    opacity: 0.3;
+  }
+  70% {
+    animation-timing-function: ease-out;
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+</style>
 
 ---
 layout: default
@@ -445,6 +498,17 @@ layout: none
 ---
 
 <DemoIframe path="/webgl/boids" fallbackTitle="WebGL boids" delay="1s" />
+<img v-click="['+1', '+1']" src="/gif-marin.gif" />
+
+<style>
+  img {
+    mask-image: linear-gradient(to right, transparent 50%, black 50%);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-75%, -50%);
+  }
+</style>
 
 ---
 layout: default
@@ -454,8 +518,8 @@ layout: default
 
 <v-clicks>
 
-- API proche du C
-- état global
+- API verbeuse, éloignée du JavaScript moderne
+- état global difficile à gérer
 - surcharge CPU sur les grosses scènes
 - pixelliser des triangles pour faire des calculs
 
@@ -464,6 +528,7 @@ layout: default
 <style>
   ul {
     font-size: 1.25em;
+    margin-top: 2em;
 
     li {
       padding-left: .5em;
@@ -500,7 +565,7 @@ layout: center
 layout: statement
 ---
 
-# WebGPU
+<h1>Web<span class="gpu">GPU</span></h1>
 
 ---
 layout: center
@@ -640,7 +705,7 @@ layout: none
 layout: none
 ---
 
-<Youtube id="gKTQ3VWn0cU?start=3"  width="100%" height="100%" />
+<Youtube id="gKTQ3VWn0cU?start=3&mute=1&rel=0"  width="100%" height="100%"  />
 
 <style>
   iframe {
@@ -654,7 +719,7 @@ layout: default
 
 # WebGPU Render Bundles
 
-```ts{1-10|12,16}
+```ts{all|1-10|12,16}
 function setup() {
   const bundleEncoder = device.createRenderBundleEncoder(...);
   for (let object of objects) {

@@ -40,6 +40,14 @@
 
 h1 {
   font-weight: bold;
+
+  .gl {
+    color: #990001;
+  }
+
+  .gpu {
+    color: #015a9c;
+  }
 }
 
 .two-columns.grid-cols-2 {
