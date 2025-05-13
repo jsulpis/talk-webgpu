@@ -1,5 +1,5 @@
 import type { Params } from "../../commons/tweakpane";
-import { type BoidsUniforms, computeTime } from "../../shared";
+import { computeTime, type BoidsUniforms } from "../../shared/params";
 import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "../utils";
 import computeShaderSource from "./shaders/compute.wgsl?raw";
 

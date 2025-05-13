@@ -7,7 +7,7 @@ import Layout from "../../layouts/Layout.astro";
   import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
   import { clone } from "three/addons/utils/SkeletonUtils.js";
-  import { BOUNDS } from "../../shared";
+  import { BOUNDS } from "../../shared/params";
   import { computeVelocities, computePositions } from "../../three/gpgpu";
 
   const modelUrl = "/Fish.glb";

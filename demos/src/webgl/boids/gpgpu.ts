@@ -1,4 +1,4 @@
-import type { BoidsUniforms } from "../../shared";
+import type { BoidsUniforms } from "../../shared/params";
 import { createDataTexture, initProgram } from "../utils";
 import updatePositionsFragmentShader from "./shaders/positions.frag?raw";
 import updateVelocitiesFragmentShader from "./shaders/velocities.frag?raw";

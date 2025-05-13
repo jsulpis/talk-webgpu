@@ -5,15 +5,15 @@ import Layout from "../../layouts/Layout.astro";
 <script>
   import { loadOBJ } from "../../models/objLoader";
   import {
-    boidsUniforms,
-    canvasBackground,
-    jsTime,
-    renderTime,
-    renderUniforms,
-    setAnimationLoop,
-    speed,
     BOUNDS,
-  } from "../../shared";
+    boidsUniforms,
+    renderUniforms,
+    canvasBackground,
+    renderTime,
+    speed,
+    jsTime,
+  } from "../../shared/params";
+  import { setAnimationLoop } from "../../shared/helpers";
   import { useBoidsGPU } from "../../webgpu/boids/gpgpu";
   import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "../../webgpu/utils";
   import shaderSource from "../../webgpu/boids/shaders/render.wgsl?raw";

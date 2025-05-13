@@ -3,7 +3,8 @@ import Layout from "../../layouts/Layout.astro";
 ---
 
 <script>
-  import { jsTime, renderTime, renderUniforms, canvasBackground, setAnimationLoop, BOUNDS } from "../../shared";
+  import { BOUNDS, canvasBackground, renderUniforms, jsTime, renderTime } from "../../shared/params";
+  import { setAnimationLoop } from "../../shared/helpers";
   import { Pane } from "tweakpane";
   import { generateColors, generateInitialPositions, generateScales } from "../../shared/data";
   import { setupNaive } from "../../webgl/objects/naive";

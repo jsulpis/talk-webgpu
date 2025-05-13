@@ -4,7 +4,8 @@ import Layout from "../../layouts/Layout.astro";
 
 <script>
   import { createSphereGeometry } from "../../models/sphere";
-  import { canvasBackground, jsTime, renderTime, renderUniforms, setAnimationLoop, BOUNDS } from "../../shared";
+  import { BOUNDS, renderUniforms, canvasBackground, renderTime, jsTime } from "../../shared/params";
+  import { setAnimationLoop } from "../../shared/helpers";
   import { initTimingObjects, resolveTimingQuery, readTimingBuffer } from "../../webgpu/utils";
   import shaderSource from "../../webgpu/objects/render.wgsl?raw";
   import { createPane, type Params } from "../../commons/tweakpane";

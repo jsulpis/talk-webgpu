@@ -60,7 +60,7 @@ export function setupInstanced(
   const instanceColorBuffer = createStaticBuffer(gl, instanceColors);
   const instanceScaleBuffer = createStaticBuffer(gl, scales);
 
-  function drawInstanced(objectsCount: number, renderUniforms: typeof import("../../shared").renderUniforms) {
+  function drawInstanced(objectsCount: number, renderUniforms: typeof import("../../shared/params").renderUniforms) {
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);

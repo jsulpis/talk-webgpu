@@ -46,7 +46,7 @@ export function setupNaive(
     scale: scales[i],
   }));
 
-  function drawNaive(objectsCount: number, renderUniforms: typeof import("../../shared").renderUniforms) {
+  function drawNaive(objectsCount: number, renderUniforms: typeof import("../../shared/params").renderUniforms) {
     for (let i = 0; i < objectsCount; i++) {
       const objectData = objectsData[i];
 

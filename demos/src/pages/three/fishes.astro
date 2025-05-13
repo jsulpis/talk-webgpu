@@ -8,7 +8,8 @@ import Layout from "../../layouts/Layout.astro";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
   import { clone } from "three/addons/utils/SkeletonUtils.js";
   import { computePositions, computeVelocities } from "../../three/gpgpu";
-  import { canvasBackground, renderTime, setAnimationLoop } from "../../shared";
+  import { canvasBackground, renderTime } from "../../shared/params";
+  import { setAnimationLoop } from "../../shared/helpers";
   import { type Params } from "../../commons/tweakpane";
   import { Pane } from "tweakpane";
 

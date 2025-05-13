@@ -5,16 +5,15 @@ import Layout from "../../layouts/Layout.astro";
 <script>
   import { loadOBJ } from "../../models/objLoader";
   import {
-    boidsUniforms,
+    BOUNDS,
     canvasBackground,
-    computeTime,
+    renderUniforms,
+    boidsUniforms,
+    speed,
     jsTime,
     renderTime,
-    renderUniforms,
-    setAnimationLoop,
-    speed,
-    BOUNDS,
-  } from "../../shared";
+    computeTime,
+  } from "../../shared/params";
   import vsSource from "../../webgl/boids/shaders/render.vert?raw";
   import fsSource from "../../webgl/boids/shaders/render.frag?raw";
   import { createStaticBuffer, initProgram } from "../../webgl/utils";
@@ -22,6 +21,7 @@ import Layout from "../../layouts/Layout.astro";
   import { createPane, type Params } from "../../commons/tweakpane";
   import { generateInitialPositions, generateInitialVelocities } from "../../shared/data";
   import { generateColors } from "../../shared/data";
+  import { setAnimationLoop } from "../../shared/helpers";
 
   const COUNT = 5000;
 
