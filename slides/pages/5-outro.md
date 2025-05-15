@@ -22,11 +22,9 @@ layout: center
   </div>
   <div class="h-full grid place-items-center relative grid-rows-1">
     <img class="h-90" src="/qr-code.png" alt="qr code with links" />
-      <RenderWhen :context="['slide']">
-        <RenderWhen :context="['visible']">
-          <iframe class="absolute top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%]" :src="`${$slidev.configs.demosBaseUrl}/three/fish`"></iframe>
-        </RenderWhen>
-      </RenderWhen>
+    <div class="iframe-container">
+      <DemoIframe class="iframe-intro" path="/three/fish" />
+    </div>
     <a href="https://bento.me/jsulpis-talk-webgpu" target="_blank" class="absolute top-[98%]">
       bento.me/jsulpis-talk-webgpu
     </a>
@@ -53,5 +51,15 @@ layout: center
     gap: .5em;
     align-items: center;
     margin-block: 0 1rem !important;
+  }
+
+  .iframe-container {
+    position: absolute;
+    pointer-events: none;
+    width: 80%;
+    aspect-ratio: 2;
+    top: 50%;
+    left: 50%;
+    transform:  translate(-50%, -50%);
   }
 </style>

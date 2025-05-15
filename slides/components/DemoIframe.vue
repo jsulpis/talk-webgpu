@@ -4,26 +4,27 @@ defineProps<{
   fallbackTitle: string;
   delay?: string;
 }>();
+
+const demosBaseUrl = import.meta.env.VITE_DEMOS_BASE_URL;
 </script>
 
 <template>
   <RenderWhen :context="['slide']">
     <RenderWhen :context="['visible']">
-      <iframe :src="`${$slidev.configs.demosBaseUrl}${path}`"></iframe>
+      <iframe :src="`${demosBaseUrl}${path}`"></iframe>
     </RenderWhen>
-    <template #fallback>
+    <template #fallback v-if="fallbackTitle">
       <h1 class="fallback">&lt;iframe /&gt; : {{ fallbackTitle }}</h1>
     </template>
   </RenderWhen>
 </template>
 
 <style>
-[frontmatter]:has(iframe, h1.fallback) {
+:where([frontmatter]:has(iframe, h1.fallback)) {
   display: grid;
 
   &,
-  & > div,
-  & > div > iframe {
+  & > div {
     height: 100%;
     width: 100%;
   }
@@ -33,6 +34,12 @@ defineProps<{
     place-self: center;
     text-align: center;
   }
+}
+
+div:has(> iframe),
+iframe {
+  height: 100%;
+  width: 100%;
 }
 
 iframe {

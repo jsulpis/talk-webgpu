@@ -4,7 +4,6 @@ defaults:
   layout: center
 colorSchema: light
 background: "rgb(204,229,255)"
-demosBaseUrl: http://localhost:4321
 drawings:
   persist: false
 transition: fade
@@ -21,11 +20,22 @@ layout: statement
   <p class="m-0! text-xl">16/05/2025</p>
 </div>
 
-<RenderWhen :context="['slide']">
-  <RenderWhen :context="['visible']">
-    <iframe class="absolute pointer-events-none w-full h-full transform-origin-[top_left] scale-130 top-0 left-0" :src="`${$slidev.configs.demosBaseUrl}/three/fishes?count=1`"></iframe>
-  </RenderWhen>
-</RenderWhen>
+<div class="iframe-container">
+  <DemoIframe class="iframe-intro" path="/three/fishes?count=1" />
+</div>
+
+<style>
+  .iframe-container {
+    position: absolute;
+    pointer-events: none;
+    width: 100%;
+    aspect-ratio: 2;
+    transform-origin: top left;
+    transform: scale(1.3);
+    bottom: 0;
+    right: 0;
+  }
+</style>
 
 ---
 src: ./pages/1-intro.md
