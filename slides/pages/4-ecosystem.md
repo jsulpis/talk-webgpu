@@ -32,6 +32,12 @@ layout: center
 </a>
 
 ---
+layout: center
+---
+
+<img class="h-full" src="/webgpu-ecosystem-apps.png" alt="WebGPU apps ecosystem" />
+
+---
 layout: default
 ---
 
