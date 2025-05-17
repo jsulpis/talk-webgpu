@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "slidev build",
+    "build": "slidev build --base /talk-webgpu/",
     "dev": "slidev",
     "export": "slidev export"
   },

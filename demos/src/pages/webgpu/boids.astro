@@ -182,7 +182,7 @@ import Layout from "../../layouts/Layout.astro";
     });
 
     // const geometry = createSphereGeometry(1.0);
-    const geometry = await loadOBJ("/fish.obj");
+    const geometry = await loadOBJ("/talk-webgpu/fish.obj");
 
     const positionBuffer = device.createBuffer({
       size: geometry.positions.byteLength,

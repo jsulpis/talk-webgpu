@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "prebuild": "rm -rf dist",
+    "build": "pnpm -r build && mv demos/dist dist && mv slides/dist/* dist",
+    "dev": "pnpm -r dev"
+  }
+}
