@@ -6,6 +6,8 @@ settings:
 
 importers:
 
+  .: {}
+
   demos:
     dependencies:
       astro:
@@ -33,6 +35,9 @@ importers:
 
   slides:
     dependencies:
+      '@iconify-json/fa6-brands':
+        specifier: 1.2.6
+        version: 1.2.6
       '@slidev/cli':
         specifier: ^51.6.0
         version: 51.6.0(@babel/parser@7.27.1)(@nuxt/kit@3.17.1(magicast@0.3.5))(@types/markdown-it@14.1.2)(@types/node@18.19.87)(@vue/compiler-sfc@3.5.13)(magicast@0.3.5)(markdown-it-async@2.2.0)(postcss@8.5.3)
@@ -393,6 +398,9 @@ packages:
 
   '@iconify-json/carbon@1.2.8':
     resolution: {integrity: sha512-6xh4YiFBz6qoSnB3XMe23WvjTJroDFXB17J1MbiT7nATFe+70+em1acRXr8hgP/gYpwFMHFc4IvjA/IPTPnTzg==}
+
+  '@iconify-json/fa6-brands@1.2.6':
+    resolution: {integrity: sha512-twL3X4KWcxAhbc1vz/mIDsVr+CAItk1/EIfxKUVQtpv6O4eydk5KNYqTZWdvJNHGInUgd6vKg21aWfVgb5DXEg==}
 
   '@iconify-json/ph@1.2.2':
     resolution: {integrity: sha512-PgkEZNtqa8hBGjHXQa4pMwZa93hmfu8FUSjs/nv4oUU6yLsgv+gh9nu28Kqi8Fz9CCVu4hj1MZs9/60J57IzFw==}
@@ -3742,6 +3750,10 @@ snapshots:
   '@floating-ui/utils@0.2.9': {}
 
   '@iconify-json/carbon@1.2.8':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify-json/fa6-brands@1.2.6':
     dependencies:
       '@iconify/types': 2.0.0
 

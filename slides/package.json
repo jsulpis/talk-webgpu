@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "build": "slidev build --base /talk-webgpu/",
-    "dev": "slidev",
+    "dev": "slidev --base /talk-webgpu/",
     "export": "slidev export"
   },
   "dependencies": {
+    "@iconify-json/fa6-brands": "1.2.6",
     "@slidev/cli": "^51.6.0",
     "@slidev/theme-default": "latest",
     "@slidev/theme-seriph": "latest",
