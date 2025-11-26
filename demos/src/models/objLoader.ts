@@ -1,7 +1,7 @@
 interface Geometry {
-  positions: Float32Array;
-  normals: Float32Array;
-  indices: Uint16Array;
+  positions: Float32Array<ArrayBuffer>;
+  normals: Float32Array<ArrayBuffer>;
+  indices: Uint16Array<ArrayBuffer>;
 }
 
 export async function loadOBJ(url: string): Promise<Geometry> {

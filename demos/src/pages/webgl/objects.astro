@@ -3,6 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 ---
 
 <script>
+  import { mat4 } from "gl-matrix";
   import { BOUNDS, canvasBackground, renderUniforms, jsTime, renderTime } from "../../shared/params";
   import { setAnimationLoop } from "../../shared/helpers";
   import { Pane } from "tweakpane";
@@ -21,7 +22,7 @@ import Layout from "../../layouts/Layout.astro";
 
   const params = {
     api: "WebGL",
-    objects: Number(countParam || 10),
+    objects: Number(countParam || 100),
     method: "naive",
     jsTime: "0ms",
     renderTime: "0ms",
@@ -44,7 +45,7 @@ import Layout from "../../layouts/Layout.astro";
   } else {
     pane.addBinding(params, "objects", {
       label: "objects",
-      min: 1,
+      min: 100,
       max: MAX_COUNT,
       step: 1,
     });
@@ -75,7 +76,7 @@ import Layout from "../../layouts/Layout.astro";
     canvas.width = window.innerWidth * devicePixelRatio;
     canvas.height = window.innerHeight * devicePixelRatio;
 
-    const gl = canvas.getContext("webgl2", { powerPreference: "high-performance" })!;
+    const gl = canvas.getContext("webgl2", { powerPreference: "high-performance", antialias: false })!;
     if (!gl) {
       console.error("Unable to initialize WebGL. Your browser or machine may not support it.");
       return;
@@ -110,6 +111,12 @@ import Layout from "../../layouts/Layout.astro";
         return;
       }
       getGPUTime();
+
+      const viewMatrix = mat4.create();
+      mat4.translate(viewMatrix, viewMatrix, [0, 0, -BOUNDS]);
+      mat4.rotateY(viewMatrix, viewMatrix, performance.now() / 30000);
+      renderUniforms.viewMatrix = viewMatrix;
+
       drawScene();
       endGPUTime();
 

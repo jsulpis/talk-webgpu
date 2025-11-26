@@ -45,7 +45,7 @@ import Layout from "../../layouts/Layout.astro";
     canvas.width = window.innerWidth * devicePixelRatio;
     canvas.height = window.innerHeight * devicePixelRatio;
 
-    const gl = canvas.getContext("webgl2")!;
+    const gl = canvas.getContext("webgl2", { powerPreference: "high-performance", antialias: false })!;
     if (!gl) {
       console.error("Unable to initialize WebGL. Your browser or machine may not support it.");
       return;

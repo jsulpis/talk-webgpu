@@ -3,6 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 ---
 
 <script>
+  import { mat4 } from "gl-matrix";
   import { createSphereGeometry } from "../../models/sphere";
   import { BOUNDS, renderUniforms, canvasBackground, renderTime, jsTime } from "../../shared/params";
   import { setAnimationLoop } from "../../shared/helpers";
@@ -314,6 +315,12 @@ import Layout from "../../layouts/Layout.astro";
     }
 
     setAnimationLoop(function render({ startTime }) {
+      const rotatedViewMatrix = mat4.create();
+      mat4.translate(rotatedViewMatrix, rotatedViewMatrix, [0, 0, -BOUNDS]);
+      mat4.rotateY(rotatedViewMatrix, rotatedViewMatrix, performance.now() / 30000);
+      uniformData.set(rotatedViewMatrix, 16);
+      device.queue.writeBuffer(uniformBuffer, 64, new Float32Array(rotatedViewMatrix));
+
       drawScene();
 
       jsTime.addValue(performance.now() - startTime);
