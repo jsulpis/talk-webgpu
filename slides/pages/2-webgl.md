@@ -136,14 +136,6 @@ layout: none
 layout: default
 ---
 
-# Render Pipeline
-
-<img class="mt-8 scale-110" src="/render-pipeline.png" alt="Render pipeline" />
-
----
-layout: default
----
-
 # WebGL
 
 <em>main.js</em>
@@ -218,6 +210,14 @@ layout: default
 # WebGL
 
 <img class="mt-5" src="/webgl-cpu-overhead.png" alt="WebGL CPU Overhead" />
+
+---
+layout: default
+---
+
+# WebGL
+
+<img class="mt-20 w-80% mx-auto" src="/console-warnings.png" alt="256 warnings in console" />
 
 ---
 layout: none
