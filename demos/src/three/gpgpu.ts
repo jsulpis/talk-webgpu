@@ -81,7 +81,7 @@ export function computeVelocities(
       const diff = subtract(selfPosition, otherPosition);
       const distance = length(diff);
 
-      const isInFieldOfView = dot(normalize(selfVelocity), normalize(subtract(otherPosition, selfPosition))) > 0.5;
+      const isInFieldOfView = dot(normalize(selfVelocity), normalize(subtract(otherPosition, selfPosition))) > 0;
 
       if (isInFieldOfView && (!skipFirst || i > 0)) {
         // Alignment - align with the direction of other boids
@@ -120,7 +120,7 @@ export function computeVelocities(
 
     // Keep boids within bounds
     const distToCenter = length(selfPosition);
-    acceleration = add(acceleration, scale(selfPosition, -distToCenter * 0.0003));
+    acceleration = add(acceleration, scale(selfPosition, -distToCenter * 0.0004));
 
     velocity = add(velocity, scale(acceleration, deltaTime));
 
