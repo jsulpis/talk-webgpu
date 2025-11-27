@@ -2,7 +2,7 @@
 layout: center
 ---
 
-<div class="grid grid-cols-1 place-items-center">
+<div class="grid grid-cols-2 place-items-center">
   <div>
     <h1>Julien Sulpis</h1>
     <p>Tech Lead - Consultant Web</p>
@@ -16,9 +16,20 @@ layout: center
       <a href="https://www.linkedin.com/in/julien-sulpis/">
         <fa6-brands-linkedin/>
       </a>
-      <span>&bull;</span>
+      <strong>&middot;</strong>
       <a href="https://www.jsulpis.dev/fr">www.jsulpis.dev</a>
     </div>
+    <img class="h-12 mt-8 ml-5" src="/logo_zenika.png" alt="Logo Zenika" />
+  </div>
+
+  <div class="h-full grid place-items-center relative grid-rows-1">
+    <img class="h-90 mx-6" src="/qr-code.png" alt="qr code with links" />
+    <div class="iframe-container">
+      <DemoIframe class="iframe-intro" path="/three/fish" />
+    </div>
+    <a href="https://jsulpis.dev/fr/conferences/evenements/2025-11-28-devfest-lyon-webgpu" target="_blank" class="absolute text-xs top-[98%]">
+      jsulpis.dev/fr/conferences/evenements/2025-11-28-devfest-lyon-webgpu
+    </a>
   </div>
 </div>
 
