@@ -9,7 +9,7 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "astro": "^5.7.4"
+    "astro": "^5.15.9"
   },
   "devDependencies": {
     "@tweakpane/core": "2.0.5",
