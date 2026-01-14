@@ -39,7 +39,9 @@
 }
 
 h1 {
-  font-weight: bold;
+  .slidev-layout & {
+    font-weight: 500;
+  }
 
   .gl {
     color: #990001;

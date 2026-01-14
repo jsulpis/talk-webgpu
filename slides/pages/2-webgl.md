@@ -394,10 +394,9 @@ layout: center
 </div>
 
 ---
-layout: center
+layout: default
 ---
 
 # Can I Use ? No.
 
 <img src="/caniuse.png" alt="WebGPU support" />
-<span v-click class="absolute right-20 top-20 text-5xl">😎</span>
