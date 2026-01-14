@@ -16,7 +16,9 @@
     "vue": "3.5.25"
   },
   "devDependencies": {
+    "@slidev/types": "52.11.2",
     "prettier": "3.7.2",
-    "prettier-plugin-slidev": "1.0.5"
+    "prettier-plugin-slidev": "1.0.5",
+    "vite": "7.3.1"
   }
 }
