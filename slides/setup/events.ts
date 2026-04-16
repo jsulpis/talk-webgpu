@@ -14,4 +14,10 @@ export default {
     referencesUrl: "https://www.jsulpis.dev/fr/conferences/webgpu",
     qrCodeUrl: import.meta.env.BASE_URL + "qr-code-snowcamp.png",
   },
+  devoxx: {
+    name: "Devoxx France",
+    date: "23/04/2026",
+    referencesUrl: "https://www.jsulpis.dev/fr/conferences/webgpu",
+    qrCodeUrl: import.meta.env.BASE_URL + "qr-code.png",
+  },
 };

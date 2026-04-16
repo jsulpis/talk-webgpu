@@ -2,9 +2,9 @@
 import { defineAppSetup } from "@slidev/types";
 import events from "./events";
 
-const zenikaBrand = {
-  logoVertical: import.meta.env.BASE_URL + "/logo_zenika_vertical.png",
-  logoHorizontal: import.meta.env.BASE_URL + "/logo_zenika.png",
+const scalewayBrand = {
+  logoVertical: import.meta.env.BASE_URL + "/logo_scaleway.svg",
+  logoHorizontal: import.meta.env.BASE_URL + "/logo_scaleway.svg",
 };
 
 const empty = {};
@@ -12,7 +12,7 @@ const isProd = import.meta.env.PROD;
 const lastEvent = Object.values(events).at(-1);
 
 const currentEvent = isProd ? empty : lastEvent;
-const brand = isProd ? empty : zenikaBrand;
+const brand = isProd ? empty : scalewayBrand;
 
 export default defineAppSetup(({ app }) => {
   app.config.globalProperties.$event = currentEvent;

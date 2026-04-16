@@ -65,3 +65,8 @@ console.log(embeddings.tolist());
 layout: image
 image: /cloudflare-workers.png
 ---
+
+---
+layout: image
+image: /scaleway.com_fr_gpu-instances.png
+---
