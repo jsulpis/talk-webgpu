@@ -18,6 +18,12 @@ export default {
     name: "Devoxx France",
     date: "23/04/2026",
     referencesUrl: "https://www.jsulpis.dev/fr/conferences/webgpu",
-    qrCodeUrl: import.meta.env.BASE_URL + "qr-code.png",
+    qrCodeUrl: import.meta.env.BASE_URL + "qr-code-devoxx.png",
+  },
+  sunnytech: {
+    name: "Sunny Tech",
+    date: "02/07/2026",
+    referencesUrl: "https://www.jsulpis.dev/fr/conferences/webgpu",
+    qrCodeUrl: import.meta.env.BASE_URL + "qr-code-sunnytech.png",
   },
 };

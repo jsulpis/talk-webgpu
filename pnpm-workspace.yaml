@@ -1,3 +1,7 @@
 packages:
   - demos
   - slides
+
+allowBuilds:
+  esbuild: true
+  sharp: true

@@ -8,7 +8,7 @@ layout: center
     <p class="text-xl">Lead Design System Developer</p>
     <div class="flex gap-4 items-center">
       <a href="https://www.jsulpis.dev/fr">www.jsulpis.dev</a>
-      <strong>&middot;</strong>
+      <strong>|</strong>
       <a href="https://github.com/jsulpis" title="GitHub">
         <fa6-brands-github/>
       </a>
