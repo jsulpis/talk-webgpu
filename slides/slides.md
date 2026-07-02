@@ -7,7 +7,7 @@ background: "rgb(204,229,255)"
 drawings:
   persist: false
 transition: fade
-title: "La révolution WebGPU : des animations plus folles, des calculs plus rapides, hors du navigateur ? 🤯"
+title: "La révolution WebGPU : toute la puissance du GPU, sur le web et en dehors 🚀"
 info: "Présentation sur WebGPU"
 src: ./pages/0-title.md
 ---

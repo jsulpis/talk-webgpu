@@ -8,7 +8,7 @@ layout: statement
     <div>
       <strong class="text-3xl mt-8! block">Julien Sulpis</strong>
       <p v-if="$event.name" class="mt-2! mb-2!">{{ $event.name }}</p>
-      <p v-if="$event.date" class="m-0! text-5">{{ $event.date }}</p>
+      <p v-if="$event.date" class="m-0! text-4">{{ $event.date }}</p>
       <img v-if="$brand.logoVertical" :src="$brand.logoVertical" class="h-10 mt-8" />
     </div>
   </div>

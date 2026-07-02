@@ -45,7 +45,7 @@ layout: center
   }
 
   h1, a {
-    font-weight: 500;
+    font-weight: 600;  
   }
 
   p {
