@@ -26,4 +26,10 @@ export default {
     referencesUrl: "https://www.jsulpis.dev/fr/conferences/webgpu",
     qrCodeUrl: import.meta.env.BASE_URL + "qr-code-sunnytech.png",
   },
+  bdxio: {
+    name: "BDX I/O",
+    date: "30/10/2026",
+    referencesUrl: "https://www.jsulpis.dev/fr/conferences/webgpu",
+    qrCodeUrl: import.meta.env.BASE_URL + "qr-code-bdxio.png",
+  },
 };

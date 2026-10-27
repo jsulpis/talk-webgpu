@@ -399,4 +399,4 @@ layout: default
 
 # Can I Use ? No.
 
-<img src="/caniuse.png" alt="WebGPU support" />
+<img src="/caniuse.jpg" alt="WebGPU support" />
