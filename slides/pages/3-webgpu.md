@@ -295,6 +295,12 @@ layout: none
 <DemoIframe path="/webgpu/boids" fallbackTitle="WebGPU boids" delay="500ms" />
 
 ---
+layout: none
+---
+
+<DemoIframe path="/webgpu/boids-hash?count=100000" fallbackTitle="WebGPU boids with optimized algorithm" delay="500ms" />
+
+---
 layout: default
 ---
 
